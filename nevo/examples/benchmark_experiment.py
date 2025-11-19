@@ -125,10 +125,10 @@ def main():
 
     # Configuration
     PROBLEMS = [1, 2, 10, 15, 20]  # Sphere, Ellipsoid, Rosenbrock, Rastrigin, Schwefel
-    INSTANCES = [1, 2]
+    INSTANCES = [1, 2, 3, 4, 5]
     DIMENSIONS = [2, 5, 10]
     SIMULATION_TIME = 20.0
-    N_RUNS = 5
+    N_RUNS = 1
 
     output_dir = Path("benchmark_results")
     output_dir.mkdir(exist_ok=True)
