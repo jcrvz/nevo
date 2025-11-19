@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nevo"
+version = "0.1.0"
+description = "Neuromorphic Evolutionary Optimisation - Adaptive Heuristic-based Optimisation using Neuromorphic Computing"
+authors = [
+    {name = "Jorge Mario Cruz-Duarte", email = "jorge.cruz-duarte@univ-lille.fr"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "ipython>=8.31.0",
+    "numpy>=1.20.0,<2.0.0",
+    "nengo>=3.2.0",
+    "scipy>=1.15.3",
+    "matplotlib>=3.5.0",
+    "seaborn>=0.11.0",
+    "ioh>=0.3.0",
+    "cocopp>=2.7.3",
+    "coco-experiment>=2.8.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=3.0.0",
+    "black>=22.0.0",
+    "isort>=5.10.0",
+    "flake8>=4.0.0",
+    "mypy>=0.950",
+    "build>=1.0.0",
+    "twine>=4.0.2",
+]
+
+docs = [
+    "sphinx>=4.5.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "sphinx-autodoc-typehints>=1.18.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/jcrvz/nevo"
+Documentation = "https://nevo.readthedocs.io"
+Repository = "https://github.com/jcrvz/nevo"
+Issues = "https://github.com/jcrvz/nevo/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nevo*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py310', 'py311']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
