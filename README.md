@@ -1,15 +1,15 @@
-# NEVO - Neuromorphic Evolutionary Optimization
+# NEVO - Neuromorphic Evolutionary Optimisation
 
-**NEVO** (Neuromorphic EVolutionary Optimization) is a Python framework that bridges evolutionary computation and neuromorphic computing. It uses spiking neural networks to adaptively select and coordinate optimization operators in real-time.
+**NEVO** (Neuromorphic EVolutionary Optimisation) is a Python framework that bridges evolutionary computation and neuromorphic computing. It uses spiking neural networks to adaptively select and coordinate optimisation operators in real-time.
 
 ## Key Features
 
 - 🧠 **Neuromorphic operator selection** using basal ganglia circuits
 - ⚡ **Population-based parallel evaluation** for massive speedup
 - 🔄 **Adaptive learning** of operator utility weights
-- 🎯 **State-aware optimization** with real-time feature extraction
+- 🎯 **State-aware optimisation** with real-time feature extraction
 - 🔌 **Loihi-compatible** neural architectures
-- 📊 **Built-in visualization** tools
+- 📊 **Built-in visualisation** tools
 
 ## Installation
 
@@ -28,14 +28,14 @@ pip install -e .
 ## Quick Start
 
 ```python
-from nevo import NEVOptimizer
+from nevo import NEVOptimiser
 from ioh import get_problem
 
-# Define optimization problem
+# Define optimisation problem
 problem = get_problem(fid=1, dimension=10, instance=1)
 
 # Create optimizer
-optimizer = NEVOptimizer(
+optimiser = NEVOptimiser(
     objective_function=problem,
     bounds=(problem.bounds.lb, problem.bounds.ub),
     dimension=10,
@@ -95,7 +95,7 @@ If you use NEVO in your research, please cite:
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+MIT Licence - see [LICENCE](LICENSE) file for details.
 
 ## Contributing
 
