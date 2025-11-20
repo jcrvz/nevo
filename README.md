@@ -77,18 +77,18 @@ python nevo/examples/basic_example.py
 
 1. **Adaptive Selection**: Neural circuits learn which operators work best online
 2. **Parallel Processing**: Population-based evaluation across dimensions
-3. **Energy Efficiency**: Designed for neuromorphic hardware (Intel Loihi)
-4. **Biological Inspiration**: Mimics cortico-basal ganglia-thalamic loops
+3. **Energy Efficiency**: Designed for neuromorphic hardware (e.g., Intel Loihi 2, SpiNNaker)
+4. **Biological Inspiration**: Mimics Cortico-Basal Ganglia-Thalamic Loops
 
 ## Citation
 
 If you use NEVO in your research, please cite:
 
 ```bibtex
-@software{nevo2024,
+@software{nevo2025,
   title={NEVO: Neuromorphic Evolutionary Optimisation},
-  author={Cruz-Duarte, Jorge Mario},
-  year={2024},
+  author={Cruz-Duarte, Jorge Mario and Talbi, El-Ghazali},
+  year={2025},
   url={https://github.com/jcrvz/nevo}
 }
 ```
