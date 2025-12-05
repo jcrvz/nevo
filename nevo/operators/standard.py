@@ -169,7 +169,9 @@ class ParticleSwarm(ExploitationOperator):
     ) -> np.ndarray:
         """Generate candidates using PSO dynamics."""
         dim = len(centre)
-        global_best = state.get("best_v", centre)
+        global_best = state.get("best_v")
+        if global_best is None:
+            global_best = centre
 
         candidates = []
         for i in range(population_size):

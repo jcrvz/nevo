@@ -8,6 +8,8 @@ Tools for visualising NEVO optimisation results.
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import Optional, Dict, Any
+from PIL import Image
+import random
 
 
 def setup_plotting_style(fontsize: int = 14):
@@ -259,3 +261,239 @@ def plot_operator_statistics(
 
     return fig, axes
 
+
+def generate_particle_svg(
+    text: str,
+    output_svg: str = "neuroptim_particles.svg",
+    num_particles: int = 10000,
+    radius: float = 0.5,
+    fill_colour: str = "#1e4c15",
+    font_size: int = 100,
+    font_path: Optional[str] = None,
+    padding: int = 20,
+    blur_radius: int = 2,
+    min_probability: float = 0.0,
+    curl_particles: int = 1000,
+) -> str:
+    """
+    Generate an SVG with particles sampled to form text.
+
+    Particles are distributed with higher density inside the letters and
+    a smooth circular falloff outside, creating a natural scattered effect.
+    If the text contains the uppercase letter 'O', subtle spiral trajectories
+    will be added, representing particles being attracted towards it.
+
+    Parameters
+    ----------
+    text : str
+        The text string to render as particles
+    output_svg : str
+        Output SVG file path
+    num_particles : int
+        Total number of particles to generate
+    radius : float
+        Fixed particle radius
+    fill_colour : str
+        SVG fill colour for particles
+    font_size : int
+        Font size for rendering the text
+    font_path : str, optional
+        Path to a TrueType font file. If None, uses a serif font
+    padding : int
+        Padding around the text in pixels (allows particles to scatter outside)
+    blur_radius : int
+        Radius for the circular windowing to smooth probability transition
+    min_probability : float
+        Minimum probability outside the letter area (0 to 1)
+    curl_particles : int
+        Number of particles to use for the curl attractor trajectories (letter O)
+
+    Returns
+    -------
+    str
+        Path to the saved SVG file
+    """
+    from PIL import ImageDraw, ImageFont
+    from scipy.ndimage import distance_transform_edt
+    import math
+
+
+    # Load serif font
+    if font_path is not None:
+        font = ImageFont.truetype(font_path, font_size)
+    else:
+        # Try common serif fonts
+        serif_fonts = [
+            "Times New Roman.ttf",
+            "TimesNewRoman.ttf",
+            "Georgia.ttf",
+            "DejaVuSerif.ttf",
+            "/System/Library/Fonts/Times.ttc",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf",
+        ]
+        font = None
+        for font_name in serif_fonts:
+            try:
+                font = ImageFont.truetype(font_name, font_size)
+                break
+            except OSError:
+                continue
+        if font is None:
+            font = ImageFont.load_default()
+
+    # Create a temporary image to measure text size
+    temp_img = Image.new("L", (1, 1))
+    temp_draw = ImageDraw.Draw(temp_img)
+    bbox = temp_draw.textbbox((0, 0), text, font=font)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+
+    # Find positions of letter 'O' (uppercase only) for curl attractor replacement
+    o_centres = []
+    o_radii = []
+    o_char_width = 0
+    if 'O' in text:
+        # Measure each character to find O positions
+        x_offset = padding - bbox[0]
+        for i, char in enumerate(text):
+            char_bbox = temp_draw.textbbox((0, 0), text[:i+1], font=font)
+            char_start_bbox = temp_draw.textbbox((0, 0), text[:i], font=font) if i > 0 else (0, 0, 0, 0)
+
+            if char == 'O':
+                # Calculate centre of this character
+                char_left = x_offset + char_start_bbox[2]
+                char_right = x_offset + char_bbox[2]
+                char_width = char_right - char_left
+                centre_x = (char_left + char_right) / 2
+                centre_y = padding + text_height / 2
+                # The radius is the circumference radius of the O (half the character width)
+                o_radius = char_width / 2.2
+                o_centres.append((centre_x, centre_y))
+                o_radii.append(o_radius)
+
+                o_char_width = char_width
+
+    # Create text WITHOUT 'O' for the mask (replace O with space to preserve spacing)
+    text_for_mask = ''.join(3 * ' ' if c == 'O' else c for c in text)
+
+    # Create the mask image with the text (excluding O)
+    W = text_width + 2 * padding  # Extra space for O replacements
+    H = text_height + 2 * padding
+    mask_img = Image.new("L", (W, H), 0)
+    draw = ImageDraw.Draw(mask_img)
+    draw.text((padding - bbox[0], padding - bbox[1]), text_for_mask, font=font, fill=255)
+
+    # Convert to array
+    mask_arr = np.array(mask_img) / 255.0  # 1 = inside letter, 0 = outside
+
+    # Create smooth probability map using distance transform
+    # Calculate distance from each pixel to the nearest letter pixel
+    binary_mask = mask_arr > 0.5
+    distance_outside = distance_transform_edt(~binary_mask)
+
+    # Apply circular windowing: smooth exponential falloff based on distance
+    # Probability = 1 inside letters, exponentially decreasing to min_probability outside
+    prob_arr = np.where(
+        binary_mask,
+        1.0,  # Full probability inside letters
+        min_probability + (1.0 - min_probability) * np.exp(-distance_outside / blur_radius)
+    )
+
+    H, W = prob_arr.shape
+
+    # Particle sampling for ALL letters (including O)
+    points = []
+
+    for _ in range(num_particles):
+        max_attempts = 1000
+        for _ in range(max_attempts):
+            # Random position (float coordinates)
+            x = random.uniform(0, W)
+            y = random.uniform(0, H)
+
+            # Apply probability map (use int indices for array lookup)
+            ix = min(int(x), W - 1)
+            iy = min(int(y), H - 1)
+            if random.random() < prob_arr[iy, ix]:
+                points.append((x, y, radius))
+                break
+
+    # Generate curl attractor particles for each uppercase 'O'
+    # Spiral trajectories coming from outside and converging to the O's circumference (the cycle)
+    curl_points = []
+    for (cx, cy), o_r in zip(o_centres, o_radii):
+        # Generate several spiral trajectories
+        num_trajectories = random.randint(4, 7)
+        particles_per_trajectory = curl_particles // num_trajectories
+
+        for _ in range(num_trajectories):
+            # Random starting angle for this trajectory
+            theta_start = random.uniform(0, 2 * math.pi)
+
+            for _ in range(particles_per_trajectory):
+                # Parameter along the spiral (0 = far away, 1 = at the cycle)
+                t = random.uniform(0, 1)
+
+                # Start from outside and spiral towards the O's circumference (the cycle)
+                start_r = o_r * random.uniform(1.1, 2.0)
+                # Spiral inward towards the O's circumference (not the centre)
+                current_r = o_r + (start_r - o_r) * (1 - t)
+
+                # Rotation as particle approaches the cycle
+                rotation = t * math.pi * 1.2
+                theta = theta_start + rotation
+
+                # Small spread for natural look
+                current_r += random.gauss(0, o_r * 0.04)
+                theta += random.gauss(0, 0.03)
+
+                # Convert to Cartesian
+                px = cx + current_r * math.cos(theta)
+                py = cy + current_r * math.sin(theta)
+
+                curl_points.append((px, py, radius))
+
+        # Add particles on the cycle itself (the O's circumference)
+        for _ in range(curl_particles // 2):
+            theta = random.uniform(0, 2 * math.pi)
+            # Small perturbation around the cycle
+            r_noise = random.gauss(o_r, o_r * 0.04)
+            px = cx + r_noise * math.cos(theta)
+            py = cy + r_noise * math.sin(theta)
+            curl_points.append((px, py, radius))
+
+    # SVG generation
+    svg_header = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" '
+        f'width="{W}" height="{H}" viewBox="0 0 {W} {H}">\n'
+    )
+    svg_content = ""
+
+    for (x, y, r) in points:
+        svg_content += f'<circle cx="{x}" cy="{y}" r="{r}" fill="{fill_colour}" />\n'
+
+    # Add curl attractor particles
+    for (x, y, r) in curl_points:
+        svg_content += f'<circle cx="{x}" cy="{y}" r="{r}" fill="{fill_colour}" />\n'
+
+    svg_footer = "</svg>"
+
+    svg_full = svg_header + svg_content + svg_footer
+
+    # Save primary SVG with the specified fill colour
+    with open(output_svg, "w", encoding="utf-8") as f:
+        f.write(svg_full)
+
+    # Derive a filename for the white-filled variant and save it
+    if "." in output_svg:
+        base, ext = output_svg.rsplit(".", 1)
+        white_svg = f"{base}_white.{ext}"
+    else:
+        white_svg = f"{output_svg}_white"
+
+    svg_white = svg_full.replace(f'fill="{fill_colour}"', 'fill="white"')
+
+    with open(white_svg, "w", encoding="utf-8") as f:
+        f.write(svg_white)
+
+    return output_svg
