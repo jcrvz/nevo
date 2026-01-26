@@ -32,6 +32,7 @@ dependencies = [
     "cocopp>=2.7.3",
     "coco-experiment>=2.8.1",
     "pandas-stubs~=2.3.3",
+    "setuptools>=61.0",
 ]
 
 [project.optional-dependencies]
