@@ -1,11 +1,10 @@
 #!/bin/bash
 #OAR -n NEVOptExp1
-#OAR -l nodes=1,walltime=12:00:00
+#OAR -l nodes=4,walltime=12:00:00
 #OAR -t exotic
 #OAR -p neowise
 #OAR --stdout ./logs/%jobid%.stdout
 #OAR --stderr ./logs/%jobid%.stderr
-#OAR --project nevo
 
 # Activate the virtual environment
 echo "Activating the virtual environment and setting up the environment..."
