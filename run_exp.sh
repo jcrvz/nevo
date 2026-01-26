@@ -8,4 +8,7 @@ uv python pin 3.10
 
 # Clean and resync
 #rm -rf .venv uv.lock
-uv sync
+uv sync --all-extras
+
+# Activate the virtual environment
+source .venv/bin/activate
