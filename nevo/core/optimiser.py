@@ -14,6 +14,15 @@ from nevo.operators.standard import (
     DifferentialEvolution,
     ParticleSwarm,
     SpiralOptimisation,
+    RandomSearch,
+    LocalRandomWalk,
+    GravitationalSearch,
+    FireflyAlgorithm,
+    CentralForce,
+    GeneticCrossover,
+    GeneticMutation,
+    SimulatedAnnealing,
+    TabuSearch,
 )
 from nevo.core.state import StateFeatures, compute_fitness_weighted_centre
 from nevo.core.basal_ganglia import BasalGangliaSelector
@@ -118,6 +127,15 @@ class NEVOptimiser:
                 DifferentialEvolution(),
                 ParticleSwarm(),
                 SpiralOptimisation(),
+                RandomSearch(),
+                LocalRandomWalk(),
+                GravitationalSearch(),
+                FireflyAlgorithm(),
+                CentralForce(),
+                GeneticCrossover(),
+                GeneticMutation(),
+                SimulatedAnnealing(),
+                TabuSearch(),
             ]
         else:
             self.operators = operators

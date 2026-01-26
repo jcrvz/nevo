@@ -117,12 +117,161 @@ def utility_spiral(x: np.ndarray) -> float:
     return convergence * 0.8 + improvement * 0.4 + 0.1
 
 
+# ============================================================================
+# Utility functions for additional operators (inspired by customhys)
+# ============================================================================
+
+
+def utility_random_search(x: np.ndarray) -> float:
+    """
+    RandomSearch utility: high when stuck, baseline exploration.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use when nothing else works, low improvement
+    return (1.0 - improvement) * 0.4 + (1.0 - convergence) * 0.2 + 0.1
+
+
+def utility_local_random_walk(x: np.ndarray) -> float:
+    """
+    LocalRandomWalk utility: high when converging, need local refinement.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use for local refinement when near optimum
+    return convergence * 0.6 + improvement * 0.3 + 0.1
+
+
+def utility_gravitational_search(x: np.ndarray) -> float:
+    """
+    GravitationalSearch utility: high when diversity exists, need directed exploration.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use when memory has diversity and need attraction-based search
+    return diversity * 0.6 + (1.0 - convergence) * 0.3 + 0.2
+
+
+def utility_firefly(x: np.ndarray) -> float:
+    """
+    FireflyAlgorithm utility: high when moderate convergence, need attraction.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use for attraction-based exploration with some convergence
+    return diversity * 0.4 + convergence * 0.3 + improvement * 0.2 + 0.1
+
+
+def utility_central_force(x: np.ndarray) -> float:
+    """
+    CentralForce utility: high when need strong directional bias.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use when converging but need global attraction
+    return convergence * 0.4 + (1.0 - diversity) * 0.3 + improvement * 0.2
+
+
+def utility_genetic_crossover(x: np.ndarray) -> float:
+    """
+    GeneticCrossover utility: high when diversity exists, want recombination.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use when memory has diversity to combine features
+    return diversity * 0.7 + (1.0 - convergence) * 0.2 + 0.2
+
+
+def utility_genetic_mutation(x: np.ndarray) -> float:
+    """
+    GeneticMutation utility: high when converging too fast, need diversity.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use when converging and low diversity
+    return (1.0 - diversity) * 0.5 + convergence * 0.3 + 0.1
+
+
+def utility_simulated_annealing(x: np.ndarray) -> float:
+    """
+    SimulatedAnnealing utility: high when need controlled exploitation.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use for exploitation with adaptive randomness
+    return convergence * 0.5 + improvement * 0.4 + 0.2
+
+
+def utility_harmony_search(x: np.ndarray) -> float:
+    """
+    HarmonySearch utility: high when need memory-guided search.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use for balanced memory-guided exploitation
+    return diversity * 0.3 + convergence * 0.4 + improvement * 0.3 + 0.1
+
+
+def utility_tabu_search(x: np.ndarray) -> float:
+    """
+    TabuSearch utility: high when stuck in local optima.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use when stuck and need to escape visited regions
+    return (1.0 - improvement) * 0.5 + convergence * 0.3 + 0.1
+
+
+def utility_bat_algorithm(x: np.ndarray) -> float:
+    """
+    BatAlgorithm utility: high when need adaptive exploration.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use for frequency-based adaptive exploration
+    return diversity * 0.4 + (1.0 - convergence) * 0.3 + improvement * 0.2 + 0.1
+
+
+def utility_whale_optimisation(x: np.ndarray) -> float:
+    """
+    WhaleOptimisation utility: high when need spiral convergence.
+
+    Input: [diversity, improvement_rate, convergence]
+    """
+    diversity, improvement, convergence = x
+    # Use for balanced exploration-exploitation with spirals
+    return convergence * 0.4 + diversity * 0.3 + improvement * 0.2 + 0.1
+
+
 # Default utility function mapping
 DEFAULT_UTILITY_FUNCTIONS = {
+    # Core operators
     "LevyFlight": utility_levy_flight,
     "DifferentialEvolution": utility_differential_evolution,
     "ParticleSwarm": utility_particle_swarm,
     "SpiralOptimisation": utility_spiral,
+    # Exploration operators
+    "RandomSearch": utility_random_search,
+    "GravitationalSearch": utility_gravitational_search,
+    "FireflyAlgorithm": utility_firefly,
+    "CentralForce": utility_central_force,
+    "GeneticCrossover": utility_genetic_crossover,
+    # Exploitation operators
+    "GeneticMutation": utility_genetic_mutation,
+    "LocalRandomWalk": utility_local_random_walk,
+    "SimulatedAnnealing": utility_simulated_annealing,
+    "TabuSearch": utility_tabu_search,
 }
 
 
@@ -303,8 +452,11 @@ class BasalGangliaSelector:
             # Random exploration
             operator_idx = np.random.randint(self.n_operators)
         else:
-            # Use basal ganglia selection
-            operator_idx = np.argmax(operator_selection)
+            # Use basal ganglia selection; break ties randomly to avoid index-0 bias
+            if np.allclose(operator_selection, operator_selection[0], atol=1e-6):
+                operator_idx = np.random.randint(self.n_operators)
+            else:
+                operator_idx = int(np.argmax(operator_selection))
 
         selected_operator = self.operators[operator_idx]
 
@@ -324,4 +476,3 @@ class BasalGangliaSelector:
             Mapping of operator names to their current weights
         """
         return {name: util.weight for name, util in self.utilities.items()}
-

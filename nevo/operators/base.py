@@ -22,9 +22,18 @@ class Operator(ABC):
     Operators can be either:
     - EXPLORATION: Global search, diversity promotion
     - EXPLOITATION: Local refinement, convergence
+
+    Complexity levels (1-10):
+    - 1-3: Simple random-based operators
+    - 4-6: Memory-based operators
+    - 7-10: Physics/swarm-based operators
     """
 
-    def __init__(self, name: str, operator_type: str = "exploration"):
+    def __init__(self,
+                 name: str,
+                 operator_type: str = "exploration",
+                 short_name: Optional[str] = None,
+                 complexity: int = 5):
         """
         Initialize operator.
 
@@ -34,12 +43,23 @@ class Operator(ABC):
             Unique identifier for this operator
         operator_type : str
             Either "exploration" or "exploitation"
+        short_name : str, optional
+            Short name for display (defaults to first 3 letters uppercase)
+        complexity : int
+            Complexity level from 1 (simple) to 10 (complex)
         """
         self.name = name
         self.operator_type = operator_type
+        self.complexity = complexity
         self.usage_count = 0
         self.success_count = 0
         self.total_improvement = 0.0
+
+        if short_name is None:
+            self.short_name = name[:3].upper()
+        else:
+            self.short_name = short_name
+
 
     @abstractmethod
     def generate_population(
@@ -110,13 +130,21 @@ class Operator(ABC):
 class ExplorationOperator(Operator):
     """Base class for exploration operators (global search)."""
 
-    def __init__(self, name: str):
-        super().__init__(name, operator_type="exploration")
+    def __init__(self, name: str,
+                 short_name: Optional[str] = None,
+                 complexity: int = 5):
+        super().__init__(name, short_name=short_name,
+                         operator_type="exploration",
+                         complexity=complexity)
 
 
 class ExploitationOperator(Operator):
     """Base class for exploitation operators (local refinement)."""
 
-    def __init__(self, name: str):
-        super().__init__(name, operator_type="exploitation")
+    def __init__(self, name: str,
+                 short_name: Optional[str] = None,
+                 complexity: int = 5):
+        super().__init__(name, short_name=short_name,
+                         operator_type="exploitation",
+                         complexity=complexity)
 

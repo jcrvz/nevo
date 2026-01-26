@@ -8,19 +8,43 @@ Central registry for all available operators.
 from typing import Dict, Type
 from nevo.operators.base import Operator
 from nevo.operators.standard import (
+    # Core operators
     LevyFlight,
     DifferentialEvolution,
     ParticleSwarm,
     SpiralOptimisation,
+    # Exploration operators (inspired by customhys)
+    RandomSearch,
+    GravitationalSearch,
+    FireflyAlgorithm,
+    CentralForce,
+    GeneticCrossover,
+    GeneticMutation,
+    # Exploitation operators
+    LocalRandomWalk,
+    SimulatedAnnealing,
+    TabuSearch,
 )
 
 
 # Registry of available operators
 OPERATOR_REGISTRY: Dict[str, Type[Operator]] = {
+    # Core operators
     "LevyFlight": LevyFlight,
     "DifferentialEvolution": DifferentialEvolution,
     "ParticleSwarm": ParticleSwarm,
     "SpiralOptimisation": SpiralOptimisation,
+    # Exploration operators
+    "RandomSearch": RandomSearch,
+    "GravitationalSearch": GravitationalSearch,
+    "FireflyAlgorithm": FireflyAlgorithm,
+    "CentralForce": CentralForce,
+    "GeneticCrossover": GeneticCrossover,
+    # Exploitation operators
+    "GeneticMutation": GeneticMutation,
+    "LocalRandomWalk": LocalRandomWalk,
+    "SimulatedAnnealing": SimulatedAnnealing,
+    "TabuSearch": TabuSearch,
 }
 
 

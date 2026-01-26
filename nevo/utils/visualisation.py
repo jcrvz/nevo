@@ -6,13 +6,14 @@ Tools for visualising NEVO optimisation results.
 """
 
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import numpy as np
 from typing import Optional, Dict, Any
 from PIL import Image
 import random
 
 
-def setup_plotting_style(fontsize: int = 14):
+def setup_plotting_style(fontsize: int = 12):
     """
     Set up publication-quality plotting style.
 
@@ -29,11 +30,12 @@ def setup_plotting_style(fontsize: int = 14):
         'font.family': 'serif',
         'font.serif': ['Computer Modern Roman'],
         'font.size': fontsize,
-        'axes.labelsize': fontsize,
+        'axes.labelsize': fontsize -2,
         'axes.titlesize': fontsize,
-        'xtick.labelsize': fontsize,
-        'ytick.labelsize': fontsize,
-        'legend.fontsize': fontsize,
+        'xtick.labelsize': fontsize -2,
+        'ytick.labelsize': fontsize -2,
+        'legend.fontsize': fontsize - 2,
+        'figure.titlesize': fontsize,
 
         # Figure
         'figure.dpi': 300,
@@ -50,7 +52,7 @@ def setup_plotting_style(fontsize: int = 14):
         'grid.linewidth': 0.5,
         'grid.alpha': 0.3,
         'grid.color': '0.9',
-        'axes.grid': True,
+        'axes.grid': False,
 
         # Legend
         'legend.frameon': True,
@@ -70,6 +72,7 @@ def plot_optimisation_results(
     optimum: Optional[float] = None,
     title: Optional[str] = None,
     save_path: Optional[str] = None,
+    show_legend: bool = True,
 ):
     """
     Create comprehensive visualisation of optimisation results.
@@ -90,7 +93,7 @@ def plot_optimisation_results(
 
     setup_plotting_style()
 
-    fig, axes = plt.subplots(3, 1, figsize=(7, 7), sharex=True)
+    fig, axes = plt.subplots(3, 1, figsize=(4, 7), sharex=True)
 
     # Extract data
     sim = optimiser.simulator
@@ -123,41 +126,92 @@ def plot_optimisation_results(
         ax1.set_ylabel('Fitness')
         ax1.set_yscale('log')
 
-    ax1.legend(loc='upper right')
-    ax1.grid(True, alpha=0.3)
+    if show_legend:
+        ax1.legend(loc='upper right')
 
     # Plot 2: Operator selection (histogram style)
     ax2 = axes[1]
-    operator_names = [op.name for op in optimiser.operators]
-    colors = {
-        'LevyFlight': 'red',
-        'DifferentialEvolution': 'orange',
-        'ParticleSwarm': 'green',
-        'SpiralOptimisation': 'blue',
-    }
 
-    for i, op_name in enumerate(operator_names):
-        mask = operator_trace == i
+    # Separate operators by type and sort by complexity (read from operator)
+    exploration_ops = []
+    exploitation_ops = []
+    for i, op in enumerate(optimiser.operators):
+        if op.operator_type == "exploration":
+            exploration_ops.append((i, op))
+        else:
+            exploitation_ops.append((i, op))
+
+    # Sort by complexity within each group
+    exploration_ops.sort(key=lambda x: x[1].complexity)
+    exploitation_ops.sort(key=lambda x: x[1].complexity)
+
+    # Combine: exploration first, then exploitation
+    sorted_ops = exploration_ops + exploitation_ops
+    n_exploration = len(exploration_ops)
+    n_exploitation = len(exploitation_ops)
+    n_operators = len(sorted_ops)
+
+    # Create colormaps for each type (oranges for exploration, blues for exploitation)
+    cmap_exploration = cm.get_cmap('Oranges')
+    cmap_exploitation = cm.get_cmap('Blues')
+
+    # Build mapping from original index to display position and colour
+    display_names = []
+    colors = {}
+    original_to_display = {}
+
+    for display_idx, (orig_idx, op) in enumerate(sorted_ops):
+        original_to_display[orig_idx] = display_idx
+        display_names.append(op.short_name)
+
+        if op.operator_type == "exploration":
+            # Position within exploration group
+            pos_in_group = [x[1].name for x in exploration_ops].index(op.name)
+            color = cmap_exploration(0.3 + 0.6 * pos_in_group / max(1, n_exploration - 1))
+        else:
+            # Position within exploitation group
+            pos_in_group = [x[1].name for x in exploitation_ops].index(op.name)
+            color = cmap_exploitation(0.3 + 0.6 * pos_in_group / max(1, n_exploitation - 1))
+
+        colors[op.short_name] = color
+
+    # Plot each operator
+    for display_idx, (orig_idx, op) in enumerate(sorted_ops):
+        mask = operator_trace == orig_idx
         times = sim.trange()[mask]
 
         if len(times) > 0:
+            op_name = op.short_name
             # Vertical lines at each activation
-            ax2.vlines(times, i - 0.3, i + 0.3,
+            ax2.vlines(times, display_idx - 0.3, display_idx + 0.3,
                       colors=colors.get(op_name, 'gray'), alpha=0.3, linewidths=0.5)
-            # Density visualization
+            # Density visualisation
             hist, edges = np.histogram(times, bins=50)
             centers = (edges[:-1] + edges[1:]) / 2
             if hist.max() > 0:
                 density = hist / hist.max() * 0.4
-                ax2.fill_between(centers, i - density, i + density,
+                ax2.fill_between(centers, display_idx - density, display_idx + density,
                                 color=colors.get(op_name, 'gray'), alpha=0.5,
                                 label=op_name)
 
+    # Add separator line between exploration and exploitation
+    if n_exploration > 0 and n_exploitation > 0:
+        separator_y = n_exploration - 0.5
+        ax2.axhline(y=separator_y, color='black', linestyle='--', linewidth=0.8, alpha=0.5)
+
+    # Add group labels on the right
+    if n_exploration > 0:
+        ax2.text(sim.trange()[-1] * 1.02, (n_exploration - 1) / 2, 'Exploration',
+                fontsize=8, va='center', ha='left', rotation=90, alpha=0.7)
+    if n_exploitation > 0:
+        ax2.text(sim.trange()[-1] * 1.02, n_exploration + (n_exploitation - 1) / 2, 'Exploitation',
+                fontsize=8, va='center', ha='left', rotation=90, alpha=0.7)
+
     ax2.set_ylabel('Active Operator')
-    ax2.set_yticks(range(len(operator_names)))
-    ax2.set_yticklabels(operator_names)
-    ax2.grid(True, alpha=0.3, axis='x')
-    ax2.set_ylim(-0.5, len(operator_names) - 0.5)
+    ax2.set_yticks(range(len(display_names)))
+    ax2.set_yticklabels(display_names)
+    ax2.set_ylim(-0.5, n_operators - 0.5)
+    ax2.set_xlim(sim.trange()[0], sim.trange()[-1] * 1.05)
 
     # Plot 3: State features
     ax3 = axes[2]
@@ -180,7 +234,9 @@ def plot_optimisation_results(
     ax3.set_xlabel('Time (s)')
     ax3.set_ylabel('Feature Value')
     ax3.set_ylim(-0.1, 1.1)
-    ax3.legend(loc='center right')
+
+    if show_legend:
+        ax3.legend(loc='center right')
 
     # Title
     if title is None:
@@ -203,6 +259,7 @@ def plot_optimisation_results(
 def plot_operator_statistics(
     optimiser,
     save_path: Optional[str] = None,
+    show_legend: bool = True,
 ):
     """
     Plot operator usage and performance statistics.
@@ -216,43 +273,103 @@ def plot_operator_statistics(
     """
     setup_plotting_style()
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    fig, axes = plt.subplots(2, 1, figsize=(4, 4), sharex=True)
 
     # Get statistics
     stats = optimiser.get_statistics()
-    operator_names = [op.name for op in optimiser.operators]
 
-    # Plot 1: Usage counts
+    # Separate and sort operators by type and complexity (read from operator)
+    exploration_ops = []
+    exploitation_ops = []
+    for op in optimiser.operators:
+        if op.operator_type == "exploration":
+            exploration_ops.append(op)
+        else:
+            exploitation_ops.append(op)
+
+    # Sort by complexity within each group
+    exploration_ops.sort(key=lambda x: x.complexity)
+    exploitation_ops.sort(key=lambda x: x.complexity)
+
+    # Combine: exploration first, then exploitation
+    sorted_ops = exploration_ops + exploitation_ops
+    n_exploration = len(exploration_ops)
+    n_exploitation = len(exploitation_ops)
+
+    operator_names = [op.name for op in sorted_ops]
+    operator_short_names = [op.short_name for op in sorted_ops]
+
+    # Create colormaps for each type (oranges for exploration, blues for exploitation)
+    cmap_exploration = cm.get_cmap('Oranges')
+    cmap_exploitation = cm.get_cmap('Blues')
+
+    colors = []
+    for i, op in enumerate(sorted_ops):
+        if op.operator_type == "exploration":
+            pos_in_group = i
+            color = cmap_exploration(0.3 + 0.6 * pos_in_group / max(1, n_exploration - 1))
+        else:
+            pos_in_group = i - n_exploration
+            color = cmap_exploitation(0.3 + 0.6 * pos_in_group / max(1, n_exploitation - 1))
+        colors.append(color)
+
+    # Plot 1: Usage counts (as percentage)
     ax1 = axes[0]
-    counts = [stats["operator_counts"][name] for name in operator_names]
-    colors = ['red', 'orange', 'green', 'blue'][:len(operator_names)]
+    # ax1.set_title('Operator Usage')
 
-    ax1.bar(range(len(operator_names)), counts, color=colors, alpha=0.7)
+    counts = [stats["operator_counts"][name] for name in operator_names]
+    total_counts = sum(counts)
+    percentages = [100.0 * c / total_counts if total_counts > 0 else 0.0 for c in counts]
+
+    # Protect zero values for log scale by using a small epsilon
+    epsilon = 0.01
+    percentages_safe = [max(p, epsilon) for p in percentages]
+
+    ax1.bar(range(len(operator_names)), percentages_safe, color=colors, alpha=0.7)
     ax1.set_xticks(range(len(operator_names)))
-    ax1.set_xticklabels(operator_names, rotation=45, ha='right')
-    ax1.set_ylabel('Usage Count')
-    ax1.set_title('Operator Usage')
-    ax1.grid(True, alpha=0.3)
+    ax1.set_xticklabels(operator_short_names, rotation=0, ha='center')
+    ax1.set_ylabel('Usage (\\%)')
+    ax1.set_yscale('log')
+
+    # Add annotation showing what 100% means (total calls)
+    ax1.text(0.02, 0.90, f'100\\% = {total_counts:,} calls',
+             transform=ax1.transAxes, fontsize=7, va='bottom', ha='left',
+             alpha=0.7, style='italic')
+
+    # Add separator line
+    if n_exploration > 0 and n_exploitation > 0:
+        ax1.axvline(x=n_exploration - 0.5, color='black', linestyle='--', linewidth=0.8, alpha=0.5)
 
     # Plot 2: Success rates and weights
     ax2 = axes[1]
+    # ax2.set_title('Operator Performance')
+
     success_rates = [stats["operator_success_rates"][name] for name in operator_names]
     weights = [stats["operator_weights"][name] for name in operator_names]
+
+    # Protect zero values for log scale
+    success_rates_safe = [max(s, epsilon) for s in success_rates]
+    weights_safe = [max(w, epsilon) for w in weights]
 
     x = np.arange(len(operator_names))
     width = 0.35
 
-    ax2.bar(x - width/2, success_rates, width, label='Success Rate',
+    ax2.bar(x - width/2, success_rates_safe, width, label='Success Rate',
            color='green', alpha=0.7)
-    ax2.bar(x + width/2, weights, width, label='Utility Weight',
+    ax2.bar(x + width/2, weights_safe, width, label='Utility Weight',
            color='blue', alpha=0.7)
 
     ax2.set_xticks(x)
-    ax2.set_xticklabels(operator_names, rotation=45, ha='right')
+    ax2.set_xticklabels(operator_short_names, rotation=0, ha='center')
     ax2.set_ylabel('Value')
-    ax2.set_title('Operator Performance')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
+    ax2.set_yscale('log')
+
+    # Add separator line
+    if n_exploration > 0 and n_exploitation > 0:
+        ax2.axvline(x=n_exploration - 0.5, color='black', linestyle='--', linewidth=0.8, alpha=0.5)
+
+    if show_legend:
+        ax2.legend()
 
     plt.tight_layout()
 

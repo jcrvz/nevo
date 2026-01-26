@@ -26,7 +26,7 @@ def test_optimiser_initialisation():
     assert optimiser.dimension == 10
     assert optimiser.population_size == 10
     assert optimiser.memory_size == 5
-    assert len(optimiser.operators) == 4  # Default operators
+    assert len(optimiser.operators) == 13  # Default operators
 
 
 def test_optimiser_run():

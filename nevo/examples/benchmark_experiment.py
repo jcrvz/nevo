@@ -168,6 +168,10 @@ def _run_coco_batch(args_tuple):
      algorithm_name, output_dir, total_batches, batch_number) = args_tuple
 
     import cocoex
+    import nengo
+
+    # Disable Nengo cache to avoid multiprocessing lock issues
+    nengo.rc.set('decoder_cache', 'enabled', 'False')
 
     all_results = []
 
@@ -405,7 +409,10 @@ def run_coco_benchmark(
     results : pd.DataFrame
         Results from all runs
     """
-    from multiprocessing import Pool
+    import multiprocessing as mp
+
+    # Use spawn to avoid fork issues with Nengo on macOS/Linux
+    ctx = mp.get_context('spawn')
 
     # Number of batches equals number of cores
     total_batches = n_cores
@@ -433,7 +440,7 @@ def run_coco_benchmark(
         all_results.extend(results)
     else:
         # Parallel execution - multiple batches
-        with Pool(processes=n_cores) as pool:
+        with ctx.Pool(processes=n_cores) as pool:
             batch_results = pool.map(_run_coco_batch, batch_args)
             for results in batch_results:
                 all_results.extend(results)
@@ -583,6 +590,11 @@ def run_single_experiment(args_tuple):
     pd.DataFrame
         Results from the experiment
     """
+    import nengo
+
+    # Disable Nengo cache to avoid multiprocessing lock issues
+    nengo.rc.set('decoder_cache', 'enabled', 'False')
+
     (problem_id, instance, dimension, simulation_time, n_runs,
      seed_offset, suite, output_dir, algorithm_name) = args_tuple
 
@@ -635,7 +647,7 @@ def run_single_experiment(args_tuple):
 def main():
     """Run benchmark experiments."""
     import argparse
-    from multiprocessing import Pool, cpu_count
+    from multiprocessing import cpu_count
 
     def parse_int_list(value: str) -> list:
         """
@@ -836,8 +848,10 @@ def main():
                 results_df = run_single_experiment(exp)
                 all_results.append(results_df)
         else:
-            # Parallel execution
-            with Pool(processes=n_cores) as pool:
+            # Parallel execution with spawn context to avoid Nengo issues
+            import multiprocessing as mp
+            ctx = mp.get_context('spawn')
+            with ctx.Pool(processes=n_cores) as pool:
                 all_results = pool.map(run_single_experiment, experiments)
 
         # Combine all results
