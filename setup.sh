@@ -12,3 +12,13 @@ uv sync --all-extras
 
 # Activate the virtual environment
 source .venv/bin/activate
+
+# Running python from uv
+echo "Running Python from uv:"
+which python
+uv python --version
+python --version
+echo ""
+
+# Ready to run
+echo "Setup complete. You can now run your Python application within the uv environment."
