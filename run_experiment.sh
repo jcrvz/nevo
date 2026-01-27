@@ -1,13 +1,13 @@
 #!/bin/bash
 #OAR -n NEVOptExp1
-#OAR -l nodes=6,walltime=12:59:00
-#OAR -t exotic
+#OAR -l nodes=6,walltime=12:00:00
 #OAR -p neowise
 #OAR -t night
 #OAR --stdout ./logs/%jobid%.stdout
 #OAR --stderr ./logs/%jobid%.stderr
 
 # OAR job script to run the benchmark experiment using NEVO algorithm
+# -t exotic
 # -l nodes=4,walltime=12:00:00
 
 # Experiment parameters (define once, use everywhere)
