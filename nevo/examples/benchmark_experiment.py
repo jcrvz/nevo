@@ -218,6 +218,19 @@ def _run_coco_batch(args_tuple):
             print(f"[Batch {batch_number+1}/{total_batches}] "
                   f"f{problem_id:02d}, i{instance}, {dimension}D, run {run+1}/{n_runs}")
 
+            # Check if this specific run already exists (for resuming interrupted experiments)
+            if output_dir is not None:
+                run_results_file = Path(output_dir) / f'results_f{problem_id:02d}_i{instance:02d}_{dimension}D_run{run+1:02d}.csv'
+                if run_results_file.exists():
+                    try:
+                        existing_result = pd.read_csv(run_results_file)
+                        if len(existing_result) > 0:
+                            print(f"  -> Skipping (already completed)")
+                            all_results.append(existing_result.iloc[0].to_dict())
+                            continue
+                    except Exception:
+                        pass  # Ignore corrupted files, re-run
+
             # Get bounds
             lb = np.array(problem.lower_bounds)
             ub = np.array(problem.upper_bounds)
@@ -461,6 +474,7 @@ def run_benchmark(
     suite: Literal["ioh", "cocoex"] = "ioh",
     observer: Any = None,
     algorithm_name: str = "NEVO",
+    output_dir: Path = None,
 ):
     """
     Run NEVO on a benchmark problem multiple times.
@@ -483,6 +497,8 @@ def run_benchmark(
         Benchmark suite to use: "ioh" or "cocoex"
     observer : cocoex.Observer, optional
         COCO observer for logging results (only used with cocoex suite)
+    output_dir : Path, optional
+        Output directory for saving per-run results (enables resume capability)
 
     Returns
     -------
@@ -495,6 +511,19 @@ def run_benchmark(
         print(f"\n{'='*70}")
         print(f"[{suite.upper()}] Problem f{problem_id:02d}, Instance {instance}, Dimension {dimension}D, Run {run+1}/{n_runs}")
         print(f"{'='*70}")
+
+        # Check if this specific run already exists (for resuming interrupted experiments)
+        if output_dir is not None:
+            run_results_file = Path(output_dir) / f'results_f{problem_id:02d}_i{instance:02d}_{dimension}D_run{run+1:02d}.csv'
+            if run_results_file.exists():
+                try:
+                    existing_result = pd.read_csv(run_results_file)
+                    if len(existing_result) > 0:
+                        print(f"  -> Skipping run {run+1} (already completed)")
+                        results.append(existing_result.iloc[0].to_dict())
+                        continue
+                except Exception:
+                    pass  # Ignore corrupted files, re-run
 
         # Get problem using the wrapper
         problem = BenchmarkProblem(
