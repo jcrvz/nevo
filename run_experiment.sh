@@ -3,7 +3,6 @@
 #OAR -l nodes=6,walltime=12:00:00
 #OAR -p neowise
 #OAR -t exotic
-#OAR -r "2026-01-27 19:00:00"
 #OAR --stdout ./logs/%jobid%.stdout
 #OAR --stderr ./logs/%jobid%.stderr
 
