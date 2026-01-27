@@ -1,6 +1,6 @@
 #!/bin/bash
 #OAR -n NEVOptExp1
-#OAR -l nodes=6,walltime=12:00:00
+#OAR -l nodes=6,walltime=10:00:00
 #OAR -p neowise
 #OAR -t exotic
 #OAR --stdout ./logs/%jobid%.stdout
