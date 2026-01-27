@@ -16,7 +16,7 @@ source .venv/bin/activate
 # Running python from uv
 echo "Running Python from uv:"
 which python
-uv python --version
+#uv python --version
 python --version
 echo ""
 
