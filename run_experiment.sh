@@ -15,11 +15,9 @@ PROBLEMS="1-24"
 INSTANCES="1-15"
 DIMENSIONS="2,3,5,10,20,40"
 RUNS=1
-#TIME=10.0
-TIME=10.0
+TIME=20.0  # Increased for better convergence (gives ~1M evals with pop_size=100)
 CORES=0
 ALGORITHM_NAME="NEVO"
-#OUTPUT_DIR="benchmark_results_cocoex-reduced-time"
 OUTPUT_DIR="benchmark_results_cocoex"
 
 # Activate the virtual environment

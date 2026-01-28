@@ -240,12 +240,12 @@ def _run_coco_batch(args_tuple):
                 objective_function=problem,
                 bounds=(lb, ub),
                 dimension=dimension,
-                population_size=30, # 300 Reduced for speed
-                memory_size=25,
-                neurons_per_ensemble=50,  # 100 Reduced for speed
+                population_size=100,  # Increased from 50 for better exploration
+                memory_size=50,       # Increased from 25 for better diversity
+                neurons_per_ensemble=100,  # Increased from 50 for better action selection
                 dt=0.001,
-                epsilon=0.1,
-                learning_rate=0.4,
+                epsilon=0.15,         # Slightly more exploration (was 0.1)
+                learning_rate=0.3,    # Slightly lower for stability (was 0.4)
                 seed=seed,
             )
 
@@ -543,12 +543,12 @@ def run_benchmark(
             objective_function=problem,
             bounds=problem.bounds,
             dimension=dimension,
-            population_size=50,
-            memory_size=25,
-            neurons_per_ensemble=50,  # Reduced for speed
+            population_size=100,  # Increased for better exploration
+            memory_size=50,       # Increased for better diversity
+            neurons_per_ensemble=100,  # Increased for better action selection
             dt=0.001,
-            epsilon=0.1,
-            learning_rate=0.4,
+            epsilon=0.15,         # Slightly more exploration
+            learning_rate=0.3,    # Slightly lower for stability
             seed=seed_offset + run,
         )
 
