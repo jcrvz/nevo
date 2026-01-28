@@ -45,7 +45,8 @@ else
     USE_DL=""
 fi
 
-#USE_DL=""
+USE_DL=""
+CORES=0
 
 # Starting the experiment with specified parameters
 echo "Checking progress of previous runs..."
