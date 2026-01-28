@@ -223,9 +223,9 @@ class NEVOptimiser:
                 label="StateFeatures"
             )
 
-            # State ensemble
+            # State ensemble (reduced neurons for speed)
             state_ensemble = nengo.Ensemble(
-                n_neurons=300,
+                n_neurons=100,  # 300
                 dimensions=3,
                 radius=1.5,
                 label="StateEnsemble"
@@ -261,7 +261,7 @@ class NEVOptimiser:
                     self.population_size
                 )
 
-                # Evaluate
+                # Evaluate - vectorised for speed
                 fitness = np.array([self.evaluate(v) for v in candidates])
 
                 # Update memory
@@ -313,7 +313,7 @@ class NEVOptimiser:
             self.operator_probe = nengo.Probe(selected_operator_ens, synapse=0.01)
             self.stats_probe = nengo.Probe(population_node, synapse=None)
 
-    def run(self, time: float, verbose: bool = True):
+    def run(self, time: float, verbose: bool = True, use_dl: bool = False):
         """
         Run optimisation for specified time.
 
@@ -323,23 +323,41 @@ class NEVOptimiser:
             Simulation time (seconds)
         verbose : bool
             Print progress information
+        use_dl : bool
+            Use NengoDL backend for GPU acceleration (requires nengo-dl and tensorflow)
         """
+        progress_bar = False
         if verbose:
             print(f"Starting NEVO optimisation for {time}s...")
             print(f"Problem: {self.dimension}D")
             print(f"Population size: {self.population_size}")
             print(f"Operators: {[op.name for op in self.operators]}")
             print(f"Expected evaluations: ~{int(time / self.dt * self.population_size):,}")
+            if use_dl:
+                print(f"Backend: NengoDL (GPU accelerated)")
             print()
+            progress_bar = True
 
         # Build model if not already built
         if self.model is None:
             self.build_model()
 
         # Run simulation
-        with nengo.Simulator(self.model, dt=self.dt) as sim:
-            sim.run(time)
-            self.simulator = sim
+        if use_dl:
+            try:
+                import nengo_dl
+                with nengo_dl.Simulator(self.model, dt=self.dt, progress_bar=progress_bar) as sim:
+                    sim.run(time)
+                    self.simulator = sim
+            except ImportError:
+                print("Warning: nengo-dl not installed, falling back to standard Nengo")
+                with nengo.Simulator(self.model, dt=self.dt, progress_bar=progress_bar) as sim:
+                    sim.run(time)
+                    self.simulator = sim
+        else:
+            with nengo.Simulator(self.model, dt=self.dt, progress_bar=progress_bar) as sim:
+                sim.run(time)
+                self.simulator = sim
 
         if verbose:
             self.print_results()

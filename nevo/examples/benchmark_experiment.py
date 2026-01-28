@@ -165,7 +165,7 @@ def _run_coco_batch(args_tuple):
     COCO observer automatically appends to existing data files, enabling resume.
     """
     (problems, instances, dimensions, simulation_time, n_runs,
-     algorithm_name, output_dir, total_batches, batch_number) = args_tuple
+     algorithm_name, output_dir, total_batches, batch_number, use_dl) = args_tuple
 
     import cocoex
     import nengo
@@ -240,9 +240,9 @@ def _run_coco_batch(args_tuple):
                 objective_function=problem,
                 bounds=(lb, ub),
                 dimension=dimension,
-                population_size=50,
+                population_size=30, # 300 Reduced for speed
                 memory_size=25,
-                neurons_per_ensemble=100,
+                neurons_per_ensemble=50,  # 100 Reduced for speed
                 dt=0.001,
                 epsilon=0.1,
                 learning_rate=0.4,
@@ -251,7 +251,7 @@ def _run_coco_batch(args_tuple):
 
             # Run optimisation
             start_time = time.time()
-            optimiser.run(time=simulation_time, verbose=False)
+            optimiser.run(time=simulation_time, verbose=False, use_dl=use_dl)
             elapsed = time.time() - start_time
 
             # Get results
@@ -390,6 +390,7 @@ def run_coco_benchmark(
     algorithm_name: str = "NEVO",
     output_dir: Path = None,
     n_cores: int = 1,
+    use_dl: bool = False,
 ):
     """
     Run NEVO on COCO benchmark problems using proper batch system.
@@ -416,6 +417,8 @@ def run_coco_benchmark(
         Output directory for CSV results
     n_cores : int
         Number of CPU cores to use (each core runs a batch)
+    use_dl : bool
+        Use NengoDL backend for GPU acceleration
 
     Returns
     -------
@@ -443,6 +446,7 @@ def run_coco_benchmark(
             str(output_dir) if output_dir else None,
             total_batches,
             batch_number,
+            use_dl,
         ))
 
     # Run batches
@@ -541,7 +545,7 @@ def run_benchmark(
             dimension=dimension,
             population_size=50,
             memory_size=25,
-            neurons_per_ensemble=100,
+            neurons_per_ensemble=50,  # Reduced for speed
             dt=0.001,
             epsilon=0.1,
             learning_rate=0.4,
@@ -550,7 +554,7 @@ def run_benchmark(
 
         # Run optimisation
         start_time = time.time()
-        optimiser.run(time=simulation_time, verbose=True)
+        optimiser.run(time=simulation_time, verbose=False)
         elapsed = time.time() - start_time
 
         # Get results
@@ -793,6 +797,11 @@ def main():
         default=1,
         help="Current batch number (1-indexed, used with --batch for COCO)",
     )
+    parser.add_argument(
+        "--use-dl",
+        action="store_true",
+        help="Use NengoDL backend for GPU acceleration (requires nengo-dl and tensorflow)",
+    )
 
     args = parser.parse_args()
 
@@ -830,6 +839,8 @@ def main():
         print(f"Algorithm:    {args.algorithm_name}")
         print(f"Batches:      {n_cores} (1 per core)")
         print(f"COCO data:    exdata/{args.algorithm_name}")
+    if args.use_dl:
+        print(f"Backend:      NengoDL (GPU accelerated)")
     print(f"{'='*70}\n")
 
     # Build list of experiments
@@ -868,6 +879,7 @@ def main():
             algorithm_name=args.algorithm_name,
             output_dir=output_dir,
             n_cores=n_cores,
+            use_dl=args.use_dl,
         )
     else:
         # IOH suite - use original approach
