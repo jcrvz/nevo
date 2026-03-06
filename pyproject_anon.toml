@@ -1,4 +1,4 @@
-[build-system]
+ [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
@@ -7,7 +7,7 @@ name = "nevo"
 version = "0.1.0"
 description = "Neuromorphic EVolutionary Optimisation - Adaptive Heuristic-based Optimisation using Neuromorphic Computing"
 authors = [
-    {name = "Jorge Mario Cruz-Duarte", email = "jorge.cruz-duarte@univ-lille.fr"}
+    {name = "ANONYMOUS", email = "anonymous@example.com"}
 ]
 readme = "README.md"
 license = {text = "MIT"}
@@ -54,10 +54,10 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jcrvz/nevo"
+Homepage = "https://github.com/anonymous/nevo"
 Documentation = "https://nevo.readthedocs.io"
-Repository = "https://github.com/jcrvz/nevo"
-Issues = "https://github.com/jcrvz/nevo/issues"
+Repository = "https://github.com/anonymous/nevo"
+Issues = "https://github.com/anonymous/nevo/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

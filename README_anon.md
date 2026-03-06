@@ -1,15 +1,19 @@
 # NEVO - Neuromorphic Evolutionary Optimisation
+> This version of the README has been anonymized for review purposes. Many files and links have been removed to preserve anonymity.
 
 **NEVO** (Neuromorphic EVolutionary Optimisation) is a Python framework that bridges evolutionary computation and neuromorphic computing. It uses spiking neural networks to adaptively select and coordinate optimisation operators in real-time.
 
 ## Key Features
 
-- 🧠 **Neuromorphic operator selection** using basal ganglia circuits
-- ⚡ **Population-based parallel evaluation** for massive speedup
-- 🔄 **Adaptive learning** of operator utility weights
-- 🎯 **State-aware optimisation** with real-time feature extraction
-- 🔌 **Loihi-compatible** neural architectures
-- 📊 **Built-in visualisation** tools
+- 🧠 **Neuromorphic operator selection** using basal ganglia circuits and adaptive utility learning
+- ⚡ **Population-based parallel evaluation** for scalable performance
+- 🔄 **Online learning of operator utility weights** for dynamic adaptation
+- 🎯 **State-aware optimisation** with interpretable feature extraction (diversity, improvement rate, convergence)
+- 🔌 **Loihi-compatible neural architectures** for neuromorphic hardware
+- 🧩 **Extensible operator registry** supporting a wide range of metaheuristics
+- 📊 **Comprehensive visualisation tools** for results and operator statistics
+- 🧪 **Benchmarking integration** with IOHexperimenter and reproducible experiments
+- 🛠️ **Modular design** for easy extension and customisation
 
 ## Installation
 
@@ -77,6 +81,15 @@ NEVO uses a **basal ganglia** neural circuit to select between multiple optimisa
 - **DifferentialEvolution**: Memory-based directed exploration
 - **ParticleSwarm**: Velocity-based exploitation
 - **SpiralOptimisation**: Anisotropic fine-tuning
+- **RandomSearch**: Uniform random sampling
+- **LocalRandomWalk**: Small-scale local exploration
+- **GravitationalSearch**: Mass-based attraction dynamics
+- **FireflyAlgorithm**: Light-based attraction and randomisation
+- **CentralForce**: Physics-inspired global attraction
+- **GeneticCrossover**: Recombination of memory solutions
+- **GeneticMutation**: Random perturbation of solutions
+- **SimulatedAnnealing**: Temperature-based local search
+- **TabuSearch**: Memory-based local search avoiding revisits
 
 Selection is based on **state features**:
 - **Diversity**: Spread of solutions in search space
@@ -104,16 +117,16 @@ If you use NEVO in your research, please cite:
 
 ```bibtex
 @software{nevo2025,
-  title={NEVO: Neuromorphic Evolutionary Optimisation},
-  author={Cruz-Duarte, Jorge Mario and Talbi, El-Ghazali},
+  title={NEVO: A Neuromorphic EVolutionary Optimiser with Spike-Driven Cortico-Basal-Thalamic Coordination},
+  author={ANONYMOUS-AUTHOR(S)},
   year={2025},
-  url={https://github.com/jcrvz/nevo}
+  url={https://github.com/ANONYMOUS-AUTHOR(S)/nevo}
 }
 ```
 
 ## License
 
-MIT Licence - see [LICENCE](LICENSE) file for details.
+MIT Licence - see (LICENSE) file for details.
 
 ## Contributing
 
@@ -121,7 +134,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Related Projects
 
-- [neuroptimiser](https://github.com/jcrvz/neuroptimiser) - Original research implementation
+- [ANOTHER OPTIMISER BASED ON SNNS](https://github.com/ANONYMOUS/TURBO-HYPER-OPTIMISER) - Original research implementation
 - [Nengo](https://www.nengo.ai/) - Neural Engineering Framework
 - [IOHexperimenter](https://iohprofiler.github.io/) - Benchmarking suite
 
