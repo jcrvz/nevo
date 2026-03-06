@@ -105,3 +105,45 @@ def test_custom_operators():
     stats = optimiser.get_statistics()
     assert sum(stats["operator_counts"].values()) > 0
 
+
+def test_neuromorphic_dual_mode():
+    """Test the two-ensemble neuromorphic operator mode."""
+    optimiser = NEVOptimiser(
+        objective_function=sphere,
+        bounds=(-5, 5),
+        dimension=5,
+        population_size=8,
+        memory_size=6,
+        operator_mode="neuromorphic_dual",
+        seed=7,
+    )
+
+    assert len(optimiser.operators) == 2
+    assert {op.name for op in optimiser.operators} == {
+        "NeuromorphicExplorationEnsemble",
+        "NeuromorphicExploitationEnsemble",
+    }
+
+    optimiser.run(time=0.5, verbose=False)
+    stats = optimiser.get_statistics()
+    assert sum(stats["operator_counts"].values()) > 0
+
+
+def test_neuromorphic_soft_mix_mode():
+    """Test the soft-mixture mode between the two neuromorphic ensembles."""
+    optimiser = NEVOptimiser(
+        objective_function=sphere,
+        bounds=(-5, 5),
+        dimension=5,
+        population_size=8,
+        memory_size=6,
+        operator_mode="neuromorphic_soft_mix",
+        seed=11,
+    )
+
+    assert len(optimiser.operators) == 2
+    optimiser.run(time=0.5, verbose=False)
+
+    stats = optimiser.get_statistics()
+    assert stats["best_fitness"] is not None
+    assert sum(stats["operator_counts"].values()) > 0

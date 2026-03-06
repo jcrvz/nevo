@@ -24,6 +24,9 @@ from nevo.operators.standard import (
     LocalRandomWalk,
     SimulatedAnnealing,
     TabuSearch,
+    # Neuromorphic candidate generators
+    NeuromorphicExplorationEnsemble,
+    NeuromorphicExploitationEnsemble,
 )
 
 
@@ -45,6 +48,9 @@ OPERATOR_REGISTRY: Dict[str, Type[Operator]] = {
     "LocalRandomWalk": LocalRandomWalk,
     "SimulatedAnnealing": SimulatedAnnealing,
     "TabuSearch": TabuSearch,
+    # Neuromorphic candidate generators
+    "NeuromorphicExplorationEnsemble": NeuromorphicExplorationEnsemble,
+    "NeuromorphicExploitationEnsemble": NeuromorphicExploitationEnsemble,
 }
 
 

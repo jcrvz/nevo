@@ -1019,3 +1019,267 @@ class TabuSearch(ExploitationOperator):
 
         return np.array(candidates)
 
+
+class NeuromorphicExplorationEnsemble(ExplorationOperator):
+    """
+    Nengo LIF-based exploration using fast spiking neural populations.
+
+    This operator builds Nengo neural networks inside the optimiser's model
+    with LIF neurons, fast synaptic filtering, and NEF decoding.
+
+    IMPORTANT: Unlike other operators, this creates Nengo Ensembles that
+    are integrated into the main Nengo simulation loop.
+    """
+
+    def __init__(
+        self,
+        n_neurons: int = 150,
+        tau_synapse: float = 0.005,  # 5 ms
+        max_rates: tuple = (100, 200),
+        intercepts: tuple = (-1.0, 1.0),
+        use_numpy_fallback: bool = False,
+    ):
+        super().__init__("NeuromorphicExplorationEnsemble", short_name="NEX", complexity=6)
+        self.n_neurons = n_neurons
+        self.tau_synapse = tau_synapse
+        self.max_rates = max_rates
+        self.intercepts = intercepts
+        self.use_numpy_fallback = use_numpy_fallback
+        self._nengo_ensemble = None
+        self._nengo_model = None
+
+    def build_network(
+        self,
+        model: 'nengo.Network',
+        state_ensemble: 'nengo.Ensemble',
+        dimension: int
+    ) -> 'nengo.Ensemble':
+        """
+        Build Nengo LIF ensemble for exploration with spike decoding.
+        """
+        import nengo
+
+        with model:
+            # LIF spiking ensemble
+            self._nengo_ensemble = nengo.Ensemble(
+                n_neurons=self.n_neurons,
+                dimensions=dimension,
+                radius=1.5,
+                neuron_type=nengo.LIF(),
+                max_rates=nengo.dists.Uniform(self.max_rates[0], self.max_rates[1]),
+                intercepts=nengo.dists.Uniform(self.intercepts[0], self.intercepts[1]),
+                label="ExplorationEnsemble"
+            )
+
+            # Fast synaptic connection from state
+            nengo.Connection(
+                state_ensemble,
+                self._nengo_ensemble,
+                synapse=self.tau_synapse,
+                transform=[[0.1, 0.1, 0.1]] * dimension
+            )
+
+            # Probe to read decoded output from spikes
+            self._output_probe = nengo.Probe(self._nengo_ensemble, synapse=self.tau_synapse)
+
+            self._nengo_model = model
+
+        return self._nengo_ensemble
+
+    def generate_population(
+        self,
+        centre: np.ndarray,
+        state: Dict[str, Any],
+        population_size: int
+    ) -> np.ndarray:
+        """
+        Generate exploration candidates from Nengo spike decoding.
+        """
+        dim = len(centre)
+        best_v = state.get("best_v")
+        if best_v is None:
+            best_v = centre
+
+        features = state.get("state_features", np.array([0.5, 0.5, 0.0]))
+        diversity, improvement, convergence = features
+
+        # State-dependent parameters
+        exploration_scale = 0.35 * (1.0 - convergence) + 0.25 * (1.0 - diversity)
+        repulsion_mag = 0.3 * (1.0 - convergence)
+        repulsion = np.clip(centre - best_v, -0.5, 0.5)
+
+        candidates = []
+
+        # Use spike decoding (default behavior)
+        if not self.use_numpy_fallback:
+            sim = state.get('simulator')
+            if sim is None or not hasattr(self, '_output_probe'):
+                raise RuntimeError(
+                    "Neuromorphic operator requires Nengo simulator with probe. "
+                    "Set use_numpy_fallback=True for numpy-based generation."
+                )
+
+            # Get decoded output from LIF ensemble spikes
+            if len(sim.data[self._output_probe]) > 0:
+                decoded_activity = sim.data[self._output_probe][-1]
+            else:
+                # First timestep: use small random initialization
+                decoded_activity = np.random.randn(dim) * 0.1
+
+            for i in range(population_size):
+                # Use decoded neural activity as perturbation
+                # Add jitter to break symmetry if neurons haven't activated yet
+                if np.linalg.norm(decoded_activity) < 1e-6:
+                    neural_noise = np.random.randn(dim) * exploration_scale * 0.1
+                else:
+                    neural_noise = decoded_activity * exploration_scale * (0.5 + 0.5 * np.random.rand())
+                candidate = centre + repulsion_mag * repulsion + neural_noise
+                candidates.append(np.clip(candidate, -1.0, 1.0))
+
+            return np.array(candidates)
+
+        # Numpy fallback (only if explicitly enabled)
+        for _ in range(population_size):
+            noise = np.random.randn(dim) * exploration_scale
+            candidate = centre + repulsion_mag * repulsion + noise
+            candidates.append(np.clip(candidate, -1.0, 1.0))
+
+        return np.array(candidates)
+
+
+class NeuromorphicExploitationEnsemble(ExploitationOperator):
+    """
+    Nengo LIF-based exploitation using slow spiking neural populations.
+
+    This operator builds Nengo neural networks inside the optimiser's model
+    with LIF neurons, slow synaptic filtering for attractor dynamics.
+
+    IMPORTANT: Unlike other operators, this creates Nengo Ensembles that
+    are integrated into the main Nengo simulation loop.
+    """
+
+    def __init__(
+        self,
+        n_neurons: int = 200,
+        tau_synapse: float = 0.020,  # 20 ms
+        max_rates: tuple = (50, 100),
+        intercepts: tuple = (-0.5, 0.5),
+        trust_radius: float = 0.2,
+        use_numpy_fallback: bool = False,
+    ):
+        super().__init__("NeuromorphicExploitationEnsemble", short_name="NXP", complexity=6)
+        self.n_neurons = n_neurons
+        self.tau_synapse = tau_synapse
+        self.max_rates = max_rates
+        self.intercepts = intercepts
+        self.trust_radius = trust_radius
+        self.use_numpy_fallback = use_numpy_fallback
+        self._nengo_ensemble = None
+        self._nengo_model = None
+        self._attractor = None
+
+    def build_network(
+        self,
+        model: 'nengo.Network',
+        state_ensemble: 'nengo.Ensemble',
+        dimension: int
+    ) -> 'nengo.Ensemble':
+        """
+        Build Nengo LIF ensemble for exploitation with spike decoding.
+        """
+        import nengo
+
+        with model:
+            # LIF spiking ensemble
+            self._nengo_ensemble = nengo.Ensemble(
+                n_neurons=self.n_neurons,
+                dimensions=dimension,
+                radius=1.5,
+                neuron_type=nengo.LIF(),
+                max_rates=nengo.dists.Uniform(self.max_rates[0], self.max_rates[1]),
+                intercepts=nengo.dists.Uniform(self.intercepts[0], self.intercepts[1]),
+                label="ExploitationEnsemble"
+            )
+
+            # Slow synaptic connection from state
+            nengo.Connection(
+                state_ensemble,
+                self._nengo_ensemble,
+                synapse=self.tau_synapse,
+                transform=[[0.05, 0.05, 0.05]] * dimension
+            )
+
+            # Probe to read decoded output from spikes
+            self._output_probe = nengo.Probe(self._nengo_ensemble, synapse=self.tau_synapse)
+
+            self._nengo_model = model
+
+        return self._nengo_ensemble
+
+    def generate_population(
+        self,
+        centre: np.ndarray,
+        state: Dict[str, Any],
+        population_size: int
+    ) -> np.ndarray:
+        """
+        Generate exploitation candidates from Nengo spike decoding.
+        """
+        dim = len(centre)
+        best_v = state.get("best_v")
+        if best_v is None:
+            best_v = centre
+
+        features = state.get("state_features", np.array([0.5, 0.5, 0.0]))
+        diversity, improvement, convergence = features
+
+        # Attractor tracking
+        blend = 0.7 * best_v + 0.3 * centre
+        if self._attractor is None:
+            self._attractor = blend.copy()
+        self._attractor = 0.9 * self._attractor + 0.1 * blend
+
+        # Trust region
+        adaptive_radius = self.trust_radius * (0.7 + 0.5 * (1.0 - convergence))
+        local_noise = 0.08 * (1.0 - convergence) + 0.05 * (1.0 - improvement)
+
+        candidates = []
+
+        # Use spike decoding (default behavior)
+        if not self.use_numpy_fallback:
+            sim = state.get('simulator')
+            if sim is None or not hasattr(self, '_output_probe'):
+                raise RuntimeError(
+                    "Neuromorphic operator requires Nengo simulator with probe. "
+                    "Set use_numpy_fallback=True for numpy-based generation."
+                )
+
+            # Get decoded output from slow LIF ensemble spikes
+            if len(sim.data[self._output_probe]) > 0:
+                decoded_activity = sim.data[self._output_probe][-1]
+            else:
+                # First timestep: use small random initialization
+                decoded_activity = np.random.randn(dim) * 0.05
+
+            for i in range(population_size):
+                # Use decoded neural activity as constrained perturbation
+                # Add jitter to break symmetry if neurons haven't activated yet
+                if np.linalg.norm(decoded_activity) < 1e-6:
+                    neural_noise = np.random.randn(dim) * local_noise * 0.1
+                else:
+                    neural_noise = decoded_activity * local_noise * (0.5 + 0.5 * np.random.rand())
+                neural_noise = np.clip(neural_noise, -adaptive_radius, adaptive_radius)
+                candidate = self._attractor + neural_noise
+                candidates.append(np.clip(candidate, -1.0, 1.0))
+
+            return np.array(candidates)
+
+        # Numpy fallback (only if explicitly enabled)
+        for _ in range(population_size):
+            noise = np.random.randn(dim) * local_noise
+            noise = np.clip(noise, -adaptive_radius, adaptive_radius)
+            candidate = self._attractor + noise
+            candidates.append(np.clip(candidate, -1.0, 1.0))
+
+        return np.array(candidates)
+

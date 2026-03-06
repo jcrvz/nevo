@@ -254,6 +254,22 @@ def utility_whale_optimisation(x: np.ndarray) -> float:
     return convergence * 0.4 + diversity * 0.3 + improvement * 0.2 + 0.1
 
 
+def utility_neuromorphic_exploration(x: np.ndarray) -> float:
+    """
+    Neuromorphic exploration utility: prefer when progress is low or diversity drops.
+    """
+    diversity, improvement, convergence = x
+    return (1.0 - improvement) * 0.5 + (1.0 - diversity) * 0.3 + (1.0 - convergence) * 0.2
+
+
+def utility_neuromorphic_exploitation(x: np.ndarray) -> float:
+    """
+    Neuromorphic exploitation utility: prefer when converged and still improving.
+    """
+    diversity, improvement, convergence = x
+    return convergence * 0.6 + improvement * 0.3 + (1.0 - diversity) * 0.1 + 0.05
+
+
 # Default utility function mapping
 DEFAULT_UTILITY_FUNCTIONS = {
     # Core operators
@@ -272,6 +288,9 @@ DEFAULT_UTILITY_FUNCTIONS = {
     "LocalRandomWalk": utility_local_random_walk,
     "SimulatedAnnealing": utility_simulated_annealing,
     "TabuSearch": utility_tabu_search,
+    # Neuromorphic candidate generators
+    "NeuromorphicExplorationEnsemble": utility_neuromorphic_exploration,
+    "NeuromorphicExploitationEnsemble": utility_neuromorphic_exploitation,
 }
 
 

@@ -23,6 +23,8 @@ from nevo.operators.standard import (
     GeneticMutation,
     SimulatedAnnealing,
     TabuSearch,
+    NeuromorphicExplorationEnsemble,
+    NeuromorphicExploitationEnsemble,
 )
 from nevo.core.state import StateFeatures, compute_fitness_weighted_centre
 from nevo.core.basal_ganglia import BasalGangliaSelector
@@ -65,6 +67,7 @@ class NEVOptimiser:
         population_size: int = 50,
         memory_size: int = 25,
         operators: Optional[List[Operator]] = None,
+        operator_mode: str = "default",
         neurons_per_ensemble: int = 100,
         dt: float = 0.001,
         epsilon: float = 0.1,
@@ -89,6 +92,8 @@ class NEVOptimiser:
             Size of solution memory (archive)
         operators : List[Operator], optional
             Custom operators (uses default if None)
+        operator_mode : str
+            Operator selection mode: "default" or "neuromorphic_dual"
         neurons_per_ensemble : int
             Neurons per ensemble in neural networks
         dt : float
@@ -107,6 +112,9 @@ class NEVOptimiser:
         self.neurons_per_ensemble = neurons_per_ensemble
         self.dt = dt
         self.seed = seed
+        self.operator_mode = operator_mode
+        self.soft_mix_temperature = 0.35
+        self.soft_mix_concentration = 6.0
 
         # Set random seed
         if seed is not None:
@@ -122,21 +130,32 @@ class NEVOptimiser:
 
         # Initialize operators
         if operators is None:
-            self.operators = [
-                LevyFlight(),
-                DifferentialEvolution(),
-                ParticleSwarm(),
-                SpiralOptimisation(),
-                RandomSearch(),
-                LocalRandomWalk(),
-                GravitationalSearch(),
-                FireflyAlgorithm(),
-                CentralForce(),
-                GeneticCrossover(),
-                GeneticMutation(),
-                SimulatedAnnealing(),
-                TabuSearch(),
-            ]
+            if operator_mode == "default":
+                self.operators = [
+                    LevyFlight(),
+                    DifferentialEvolution(),
+                    ParticleSwarm(),
+                    SpiralOptimisation(),
+                    RandomSearch(),
+                    LocalRandomWalk(),
+                    GravitationalSearch(),
+                    FireflyAlgorithm(),
+                    CentralForce(),
+                    GeneticCrossover(),
+                    GeneticMutation(),
+                    SimulatedAnnealing(),
+                    TabuSearch(),
+                ]
+            elif operator_mode in ("neuromorphic_dual", "neuromorphic_soft_mix"):
+                self.operators = [
+                    NeuromorphicExplorationEnsemble(),
+                    NeuromorphicExploitationEnsemble(),
+                ]
+            else:
+                raise ValueError(
+                    f"Unknown operator_mode: {operator_mode}. "
+                    "Use 'default', 'neuromorphic_dual', or 'neuromorphic_soft_mix'."
+                )
         else:
             self.operators = operators
 
@@ -152,6 +171,7 @@ class NEVOptimiser:
             "operator_counts": {op.name: 0 for op in self.operators},
             "total_evals": 0,
             "f_default_worst": self.f_default_worst,
+            "state_features": np.array([0.5, 0.5, 0.0]),
         }
 
         # Initialize state features
@@ -207,6 +227,21 @@ class NEVOptimiser:
         # Age all memory
         self.state["memory_age"] += 1.0
 
+    def _compute_soft_mix_weights(self, operator_selection: np.ndarray) -> np.ndarray:
+        """Convert selector signal to stable softmax weights for blending."""
+        signal = np.asarray(operator_selection, dtype=float)
+        signal = signal - np.max(signal)
+        logits = signal / max(1e-6, self.soft_mix_temperature)
+        exps = np.exp(logits)
+        weights = exps / (np.sum(exps) + 1e-12)
+
+        # Prevent full collapse so both ensembles remain active.
+        min_w = 0.1 if len(weights) == 2 else 0.0
+        if min_w > 0.0:
+            weights = np.maximum(weights, min_w)
+            weights = weights / np.sum(weights)
+        return weights
+
     def build_model(self):
         """Build Nengo model."""
         self.model = nengo.Network(label="NEVO", seed=self.seed)
@@ -215,8 +250,11 @@ class NEVOptimiser:
             # State features node
             def state_features_func(t):
                 if t < 0.001:
-                    return np.array([0.5, 0.5, 0.0])
-                return self.state_features.compute(self.state)
+                    features = np.array([0.5, 0.5, 0.0])
+                else:
+                    features = self.state_features.compute(self.state)
+                self.state["state_features"] = features
+                return features
 
             state_features_node = nengo.Node(
                 state_features_func,
@@ -239,27 +277,71 @@ class NEVOptimiser:
                 state_ensemble
             )
 
+            # Build neuromorphic operator networks (if using neuromorphic modes)
+            if self.operator_mode in ("neuromorphic_dual", "neuromorphic_soft_mix"):
+                for operator in self.operators:
+                    # Check if operator has build_network method (neuromorphic operators do)
+                    if hasattr(operator, 'build_network'):
+                        operator.build_network(
+                            self.model,
+                            state_ensemble,
+                            self.dimension
+                        )
+
             # Population generator node
             def population_generator_func(t, operator_selection):
                 if t < 0.001:
                     self.state["total_evals"] += self.population_size
+                    self.state["state_features"] = np.array([0.5, 0.5, 0.0])
                     return np.array([0.0, 0.0, 0.0])
 
+                # Make simulator available to operators for spike decoding
+                if hasattr(self, 'simulator') and self.simulator is not None:
+                    self.state["simulator"] = self.simulator
+
                 # Select operator
+                current_best = self.state.get("best_f")
+                if current_best is None:
+                    current_best = self.f_default_worst
                 operator = self.bg_selector.select_operator(
                     operator_selection,
-                    self.state.get("best_f", self.f_default_worst)
+                    current_best
                 )
+
+                # Keep latest features available for state-aware operators.
+                self.state["state_features"] = self.state_features.compute(self.state)
 
                 # Get centre
                 centre = compute_fitness_weighted_centre(self.state)
 
                 # Generate population
-                candidates = operator.generate_population(
-                    centre,
-                    self.state,
-                    self.population_size
-                )
+                if self.operator_mode == "neuromorphic_soft_mix" and len(self.operators) == 2:
+                    explore_op, exploit_op = self.operators
+                    explore_candidates = explore_op.generate_population(
+                        centre,
+                        self.state,
+                        self.population_size
+                    )
+                    exploit_candidates = exploit_op.generate_population(
+                        centre,
+                        self.state,
+                        self.population_size
+                    )
+
+                    mix_weights = self._compute_soft_mix_weights(operator_selection)
+                    exploit_mean = float(mix_weights[1])
+                    alpha = max(0.5, exploit_mean * self.soft_mix_concentration)
+                    beta = max(0.5, (1.0 - exploit_mean) * self.soft_mix_concentration)
+                    lambdas = np.random.beta(alpha, beta, size=(self.population_size, 1))
+
+                    candidates = (1.0 - lambdas) * explore_candidates + lambdas * exploit_candidates
+                    candidates = np.clip(candidates, -1.0, 1.0)
+                else:
+                    candidates = operator.generate_population(
+                        centre,
+                        self.state,
+                        self.population_size
+                    )
 
                 # Evaluate - vectorised for speed
                 fitness = np.array([self.evaluate(v) for v in candidates])
@@ -332,6 +414,7 @@ class NEVOptimiser:
             print(f"Problem: {self.dimension}D")
             print(f"Population size: {self.population_size}")
             print(f"Operators: {[op.name for op in self.operators]}")
+            print(f"Operator mode: {self.operator_mode}")
             print(f"Expected evaluations: ~{int(time / self.dt * self.population_size):,}")
             if use_dl:
                 print(f"Backend: NengoDL (GPU accelerated)")
@@ -347,17 +430,20 @@ class NEVOptimiser:
             try:
                 import nengo_dl
                 with nengo_dl.Simulator(self.model, dt=self.dt, progress_bar=progress_bar) as sim:
-                    sim.run(time)
                     self.simulator = sim
+                    self.state["simulator"] = sim
+                    sim.run(time)
             except ImportError:
                 print("Warning: nengo-dl not installed, falling back to standard Nengo")
                 with nengo.Simulator(self.model, dt=self.dt, progress_bar=progress_bar) as sim:
-                    sim.run(time)
                     self.simulator = sim
+                    self.state["simulator"] = sim
+                    sim.run(time)
         else:
             with nengo.Simulator(self.model, dt=self.dt, progress_bar=progress_bar) as sim:
-                sim.run(time)
                 self.simulator = sim
+                self.state["simulator"] = sim
+                sim.run(time)
 
         if verbose:
             self.print_results()
