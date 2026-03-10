@@ -2,9 +2,11 @@
 Small benchmark harness for comparing NEVO operator modes.
 
 Compares:
-- default
-- neuromorphic_dual
-- neuromorphic_soft_mix
+- trad               (epsilon-greedy, no TD)
+- trad_td0           (epsilon-greedy + TD(0))
+- trad_td_lambda     (epsilon-greedy + TD(λ=0.9))
+- nm_dual
+- nm_softmix
 
 on simple analytic functions with fixed reps.
 """
@@ -36,13 +38,51 @@ def run_single(
     sim_time: float,
     seed: int,
 ) -> float:
+    # Parse TD configuration from the mode string
+    td_enabled = False
+    td_lambda = 0.0
+    operator_mode = mode
+
+    if mode == "trad_td0":
+        operator_mode = "trad"
+        td_enabled = True
+        td_lambda = 0.0
+    elif mode == "trad_td_lambda":
+        operator_mode = "trad"
+        td_enabled = True
+        td_lambda = 0.9
+    elif mode == "nm_dual_td0":
+        operator_mode = "nm_dual"
+        td_enabled = True
+        td_lambda = 0.0
+    elif mode == "nm_dual_td_lambda":
+        operator_mode = "nm_dual"
+        td_enabled = True
+        td_lambda = 0.9
+    elif mode == "nm_softmix_td0":
+        operator_mode = "nm_softmix"
+        td_enabled = True
+        td_lambda = 0.0
+    elif mode == "nm_softmix_td_lambda":
+        operator_mode = "nm_softmix"
+        td_enabled = True
+        td_lambda = 0.9
+    elif mode == "nm_dual_eps_greedy":
+        operator_mode = "nm_dual"
+    elif mode == "nm_softmix_eps_greedy":
+        operator_mode = "nm_softmix"
+    else: # mode == "trad_eps_greedy":
+        operator_mode = "trad"
+
     optimiser = NEVOptimiser(
         objective_function=objective,
         bounds=(-5.0, 5.0),
         dimension=dimension,
         population_size=30,
         memory_size=15,
-        operator_mode=mode,
+        operator_mode=operator_mode,
+        td_enabled=td_enabled,
+        td_lambda=td_lambda,
         seed=seed,
     )
     optimiser.run(time=sim_time, verbose=False)
@@ -87,11 +127,11 @@ def write_csv(rows: List[Dict[str, float]], out_csv: str) -> None:
 def print_table(rows: List[Dict[str, float]]) -> None:
     print("\nBenchmark Results")
     print("-" * 92)
-    print(f"{'problem':12s} {'mode':24s} {'mean_best_f':14s} {'std_best_f':14s} {'min_best_f':14s}")
+    print(f"{'problem':12s} {'mode':28s} {'mean_best_f':14s} {'std_best_f':14s} {'min_best_f':14s}")
     print("-" * 92)
     for r in rows:
         print(
-            f"{r['problem']:12s} {r['mode']:24s} "
+            f"{r['problem']:12s} {r['mode']:28s} "
             f"{r['mean_best_f']:14.6e} {r['std_best_f']:14.6e} {r['min_best_f']:14.6e}"
         )
     print("-" * 92)
@@ -102,6 +142,8 @@ def main() -> None:
     parser.add_argument("--dimension", type=int, default=10)
     parser.add_argument("--time", type=float, default=1.0, dest="sim_time")
     parser.add_argument("--reps", type=int, default=3)
+    parser.add_argument("--seed", "--seeds", type=int, default=None,
+                        dest="seed", help="Single seed value (overrides --reps)")
     parser.add_argument("--out", type=str, default="operator_mode_benchmark.csv")
     args = parser.parse_args()
 
@@ -109,8 +151,22 @@ def main() -> None:
         "sphere": sphere,
         "rastrigin": rastrigin,
     }
-    modes = ["default", "neuromorphic_dual", "neuromorphic_soft_mix"]
-    reps = list(range(args.reps))
+    modes = [
+        "trad_eps_greedy",
+        "trad_td0",
+        "trad_td_lambda",
+        "nm_dual_eps_greedy",
+        "nm_dual_td0",
+        "nm_dual_td_lambda",
+        "nm_softmix_eps_greedy",
+        "nm_softmix_td0",
+        "nm_softmix_td_lambda",
+    ]
+
+    if args.seed is not None:
+        reps = [args.seed]
+    else:
+        reps = list(range(args.reps))
 
     rows = benchmark(
         problems=problems,
@@ -126,4 +182,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
 

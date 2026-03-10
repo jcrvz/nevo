@@ -9,6 +9,7 @@ import nengo
 import numpy as np
 from typing import Callable, List, Optional, Dict, Any
 from nevo.operators.base import Operator
+from nevo.core.td_learning import LearningRule, ValueModel
 from nevo.operators.standard import (
     LevyFlight,
     DifferentialEvolution,
@@ -67,11 +68,16 @@ class NEVOptimiser:
         population_size: int = 50,
         memory_size: int = 25,
         operators: Optional[List[Operator]] = None,
-        operator_mode: str = "default",
+        operator_mode: str = "trad",
         neurons_per_ensemble: int = 100,
         dt: float = 0.001,
         epsilon: float = 0.1,
         learning_rate: float = 0.4,
+        td_gamma: float = 0.99,
+        td_lambda: float = 0.0,
+        td_enabled: bool = True,
+        td_learning_rule: Optional[LearningRule] = None,
+        td_value_model: Optional[ValueModel] = None,
         seed: Optional[int] = None,
     ):
         """
@@ -93,7 +99,7 @@ class NEVOptimiser:
         operators : List[Operator], optional
             Custom operators (uses default if None)
         operator_mode : str
-            Operator selection mode: "default" or "neuromorphic_dual"
+            Operator selection mode: "trad" | "traditional", "nm_dual", or "nm_softmix"
         neurons_per_ensemble : int
             Neurons per ensemble in neural networks
         dt : float
@@ -102,6 +108,16 @@ class NEVOptimiser:
             Epsilon-greedy exploration rate
         learning_rate : float
             Learning rate for utility weight adaptation
+        td_gamma : float
+            Discount factor for TD learning
+        td_lambda : float
+            Lambda parameter for TD(lambda)
+        td_enabled : bool
+            Enable TD-based value learning in selector
+        td_learning_rule : LearningRule, optional
+            Custom TD learning rule instance
+        td_value_model : ValueModel, optional
+            Custom TD value model instance
         seed : int, optional
             Random seed for reproducibility
         """
@@ -130,7 +146,7 @@ class NEVOptimiser:
 
         # Initialize operators
         if operators is None:
-            if operator_mode == "default":
+            if operator_mode in ("trad", "traditional"):
                 self.operators = [
                     LevyFlight(),
                     DifferentialEvolution(),
@@ -146,15 +162,15 @@ class NEVOptimiser:
                     SimulatedAnnealing(),
                     TabuSearch(),
                 ]
-            elif operator_mode in ("neuromorphic_dual", "neuromorphic_soft_mix"):
+            elif operator_mode in ("nm_dual", "nm_softmix"):
                 self.operators = [
                     NeuromorphicExplorationEnsemble(),
                     NeuromorphicExploitationEnsemble(),
                 ]
             else:
                 raise ValueError(
-                    f"Unknown operator_mode: {operator_mode}. "
-                    "Use 'default', 'neuromorphic_dual', or 'neuromorphic_soft_mix'."
+                    f"Unknown operator_mode: '{operator_mode}'. "
+                    "Use 'trad'/'traditional', 'nm_dual', or 'nm_softmix'."
                 )
         else:
             self.operators = operators
@@ -183,11 +199,17 @@ class NEVOptimiser:
             neurons_per_ensemble=neurons_per_ensemble,
             epsilon=epsilon,
             learning_rate=learning_rate,
+            gamma=td_gamma,
+            lambda_coeff=td_lambda,
+            learning_rule=td_learning_rule,
+            value_model=td_value_model,
+            td_enabled=td_enabled,
         )
 
         # Nengo model (will be built in run())
         self.model = None
         self.simulator = None
+        self._td_episode_started = False
 
     def evaluate(self, v: np.ndarray) -> float:
         """
@@ -278,7 +300,7 @@ class NEVOptimiser:
             )
 
             # Build neuromorphic operator networks (if using neuromorphic modes)
-            if self.operator_mode in ("neuromorphic_dual", "neuromorphic_soft_mix"):
+            if self.operator_mode in ("nm_dual", "nm_softmix"):
                 for operator in self.operators:
                     # Check if operator has build_network method (neuromorphic operators do)
                     if hasattr(operator, 'build_network'):
@@ -315,7 +337,7 @@ class NEVOptimiser:
                 centre = compute_fitness_weighted_centre(self.state)
 
                 # Generate population
-                if self.operator_mode == "neuromorphic_soft_mix" and len(self.operators) == 2:
+                if self.operator_mode == "nm_softmix" and len(self.operators) == 2:
                     explore_op, exploit_op = self.operators
                     explore_candidates = explore_op.generate_population(
                         centre,
@@ -425,6 +447,11 @@ class NEVOptimiser:
         if self.model is None:
             self.build_model()
 
+        # Start TD episode once per optimiser lifecycle.
+        if not self._td_episode_started:
+            self.bg_selector.begin_episode()
+            self._td_episode_started = True
+
         # Run simulation
         if use_dl:
             try:
@@ -458,13 +485,24 @@ class NEVOptimiser:
 
         print(f"\nOperator usage:")
         total_calls = sum(self.state["operator_counts"].values())
-        for op in self.operators:
+        td_values = self.bg_selector.get_td_values()
+        td_on = self.bg_selector.td_enabled
+
+        for i, op in enumerate(self.operators):
             count = self.state["operator_counts"][op.name]
             pct = 100 * count / max(1, total_calls)
             weight = self.bg_selector.utilities[op.name].weight
             success_rate = op.success_count / max(1, op.usage_count)
+            td_str = f"  td_V={td_values[i]:.4f}" if td_on else ""
             print(f"  {op.name:25s}: {count:6d} calls ({pct:5.1f}%)  "
-                  f"[weight: {weight:.3f}, success: {success_rate:.1%}]")
+                  f"[weight: {weight:.3f}, success: {success_rate:.1%}{td_str}]")
+
+        if td_on:
+            stats = self.bg_selector.get_td_statistics()
+            lam = self.bg_selector.td_learner.lambda_coeff
+            print(f"\nTD learning  λ={lam:.2f}  "
+                  f"mean_δ={stats.get('mean_td_error', 0.0):.4f}  "
+                  f"std_δ={stats.get('std_td_error', 0.0):.4f}")
 
         print(f"\nBest solution (v-space):")
         if self.state["best_v"] is not None:
@@ -512,3 +550,19 @@ class NEVOptimiser:
             },
         }
 
+    def reset_td_episode(self):
+        """Start a fresh TD episode without rebuilding the network."""
+        self.bg_selector.begin_episode()
+        self._td_episode_started = True
+
+    def set_td_lambda(self, lambda_coeff: float):
+        """Pass-through TD(lambda) configuration."""
+        self.bg_selector.set_td_lambda(lambda_coeff)
+
+    def set_td_learning_rule(self, learning_rule: LearningRule):
+        """Pass-through learning-rule swap for basal ganglia TD."""
+        self.bg_selector.set_learning_rule(learning_rule)
+
+    def set_td_value_model(self, value_model: ValueModel):
+        """Pass-through value-model swap for basal ganglia TD."""
+        self.bg_selector.set_value_model(value_model)
