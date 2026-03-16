@@ -30,7 +30,7 @@ class UtilityFunction:
         self,
         name: str,
         function: Callable[[np.ndarray], float],
-        initial_weight: float = 1.0
+        initial_weight: float = 1.0,
     ):
         """
         Parameters
@@ -265,7 +265,9 @@ def utility_neuromorphic_exploration(x: np.ndarray) -> float:
     Neuromorphic exploration utility: prefer when progress is low or diversity drops.
     """
     diversity, improvement, convergence = x
-    return (1.0 - improvement) * 0.5 + (1.0 - diversity) * 0.3 + (1.0 - convergence) * 0.2
+    return (
+        (1.0 - improvement) * 0.5 + (1.0 - diversity) * 0.3 + (1.0 - convergence) * 0.2
+    )
 
 
 def utility_neuromorphic_exploitation(x: np.ndarray) -> float:
@@ -360,15 +362,11 @@ class BasalGangliaSelector:
         for op in operators:
             if op.name in utility_functions:
                 self.utilities[op.name] = UtilityFunction(
-                    op.name,
-                    utility_functions[op.name]
+                    op.name, utility_functions[op.name]
                 )
             else:
                 # Default neutral utility
-                self.utilities[op.name] = UtilityFunction(
-                    op.name,
-                    lambda x: 0.5
-                )
+                self.utilities[op.name] = UtilityFunction(op.name, lambda x: 0.5)
 
         # Initialize TD learner if enabled
         if td_enabled:
@@ -390,9 +388,7 @@ class BasalGangliaSelector:
         self.episode_count = 0
 
     def build_network(
-        self,
-        model: nengo.Network,
-        state_ensemble: nengo.Ensemble
+        self, model: nengo.Network, state_ensemble: nengo.Ensemble
     ) -> nengo.Ensemble:
         """
         Build basal ganglia selection network.
@@ -418,28 +414,28 @@ class BasalGangliaSelector:
                     n_neurons=self.neurons_per_ensemble,
                     dimensions=1,
                     radius=3.0,
-                    label=f"Utility_{op.name}"
+                    label=f"Utility_{op.name}",
                 )
 
                 # Connect state to utility via utility function
                 def make_utility_func(op_name):
                     def utility_wrapper(x):
                         return self.utilities[op_name].compute(x)
+
                     return utility_wrapper
 
                 nengo.Connection(
                     state_ensemble,
                     utility_ens,
                     function=make_utility_func(op.name),
-                    synapse=0.01
+                    synapse=0.01,
                 )
 
                 utility_ensembles.append(utility_ens)
 
             # Basal ganglia (winner-take-all)
             bg = nengo.networks.BasalGanglia(
-                self.n_operators,
-                n_neurons_per_ensemble=self.neurons_per_ensemble
+                self.n_operators, n_neurons_per_ensemble=self.neurons_per_ensemble
             )
 
             # Connect utilities to basal ganglia
@@ -448,8 +444,7 @@ class BasalGangliaSelector:
 
             # Thalamus (action gating)
             thalamus = nengo.networks.Thalamus(
-                self.n_operators,
-                n_neurons_per_ensemble=self.neurons_per_ensemble
+                self.n_operators, n_neurons_per_ensemble=self.neurons_per_ensemble
             )
             nengo.Connection(bg.output, thalamus.input, synapse=None)
 
@@ -458,7 +453,7 @@ class BasalGangliaSelector:
                 n_neurons=self.neurons_per_ensemble * self.n_operators,
                 dimensions=self.n_operators,
                 radius=1.5,
-                label="SelectedOperator"
+                label="SelectedOperator",
             )
 
             nengo.Connection(thalamus.output, selected_operator_ens, synapse=0.01)
@@ -514,7 +509,7 @@ class BasalGangliaSelector:
             #   Bootstrap target: r + γ * max_j V(j)  [snapshot BEFORE update]
             # ------------------------------------------------------------------
             if self.td_enabled and self.td_learner is not None:
-                v_snapshot = self.td_learner.get_values()          # V before update
+                v_snapshot = self.td_learner.get_values()  # V before update
                 next_state_value = float(np.max(v_snapshot))
                 self.td_learner.update(
                     self.last_operator_idx,
@@ -536,7 +531,7 @@ class BasalGangliaSelector:
         bg_signal = np.asarray(operator_selection, dtype=float)
 
         if self.td_enabled and self.td_learner is not None:
-            td_values = self.td_learner.get_values()               # updated values
+            td_values = self.td_learner.get_values()  # updated values
             # Normalise both signals to [0, 1] before mixing so scales match
             bg_norm = bg_signal - bg_signal.min()
             bg_range = bg_norm.max() + 1e-8
@@ -673,4 +668,3 @@ class BasalGangliaSelector:
         """Reset all TD value estimates."""
         if self.td_enabled and self.td_learner is not None:
             self.td_learner.reset_values()
-

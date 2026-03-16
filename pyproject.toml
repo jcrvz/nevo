@@ -33,6 +33,7 @@ dependencies = [
     "coco-experiment>=2.8.1",
     "pandas-stubs~=2.3.3",
     "setuptools>=61.0",
+    "pytest>=9.0.2",
 ]
 
 [project.optional-dependencies]

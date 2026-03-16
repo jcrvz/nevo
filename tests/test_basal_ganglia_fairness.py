@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from nevo.core.basal_ganglia import BasalGangliaSelector
 from nevo.operators.base import Operator

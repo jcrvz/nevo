@@ -1,12 +1,12 @@
-# NEVO - Neuromorphic Evolutionary Optimisation
+# NEVO — Neuromorphic Evolutionary Optimisation
 
-**NEVO** (Neuromorphic EVolutionary Optimisation) is a Python framework that bridges evolutionary computation and neuromorphic computing. It uses spiking neural networks to adaptively select and coordinate optimisation operators in real-time.
+**NEVO** (Neuromorphic EVolutionary Optimisation) is a Python framework that bridges evolutionary computation and neuromorphic computing. It uses spiking neural networks to adaptively select and coordinate optimisation operators in real time.
 
 ## Key Features
 
 - 🧠 **Neuromorphic operator selection** using basal ganglia circuits
-- ⚡ **Population-based parallel evaluation** for massive speedup
-- 🔄 **Adaptive learning** of operator utility weights
+- ⚡ **Population-based parallel evaluation** at each simulation timestep
+- 🔄 **Adaptive TD learning** of operator utility weights
 - 🎯 **State-aware optimisation** with real-time feature extraction
 - 🔌 **Loihi-compatible** neural architectures
 - 📊 **Built-in visualisation** tools
@@ -27,21 +27,14 @@ cd nevo
 pip install -e .
 ```
 
-### Using uv (recommended for modern Python projects)
-
-If you have [uv](https://github.com/astral-sh/uv) installed, you can install dependencies from `pyproject.toml`:
+### Using uv (recommended)
 
 ```bash
 uv pip install -e .
+uv pip install -e . --extra dev   # includes dev dependencies
 ```
 
-Or to install all dependencies (including dev):
-
-```bash
-uv pip install -e . --extra dev
-```
-
-NEVO uses a `pyproject.toml` for dependency management and build configuration. This enables modern, reproducible Python environments.
+NEVO uses `pyproject.toml` for dependency management and build configuration.
 
 ## Quick Start
 
@@ -52,7 +45,7 @@ from ioh import get_problem
 # Define optimisation problem
 problem = get_problem(fid=1, dimension=10, instance=1)
 
-# Create optimizer
+# Create optimiser
 optimiser = NEVOptimiser(
     objective_function=problem,
     bounds=(problem.bounds.lb, problem.bounds.ub),
@@ -71,32 +64,42 @@ print(f"Best fitness: {f_best:.6e}")
 
 ## Architecture
 
-NEVO uses a **basal ganglia** neural circuit to select between multiple optimisation operators:
+NEVO uses a **basal ganglia** neural circuit to select between optimisation operators. Three operator modes are available:
 
-- **LevyFlight**: Heavy-tailed exploration for escaping local minima
-- **DifferentialEvolution**: Memory-based directed exploration
-- **ParticleSwarm**: Velocity-based exploitation
-- **SpiralOptimisation**: Anisotropic fine-tuning
+| `operator_mode` | Description |
+|---|---|
+| `"trad"` | 13 standard heuristic operators (default) |
+| `"nm_dual"` | 2 neuromorphic LIF ensembles, hard WTA switching |
+| `"nm_softmix"` | 2 neuromorphic LIF ensembles, softmax-blended |
 
-Selection is based on **state features**:
-- **Diversity**: Spread of solutions in search space
-- **Improvement rate**: Recent success frequency
-- **Convergence**: Fitness homogeneity
+Selection is driven by three **state features**:
+- **Diversity**: Spread of solutions in search space.
+- **Improvement rate**: Recent success frequency.
+- **Convergence**: Fitness homogeneity.
 
 ## Examples
 
-See the `nevo/examples/` directory for complete examples:
+See the `examples/` directory:
 
 ```bash
-python nevo/examples/basic_example.py
+python examples/basic_example.py --time 2.0 --dimensions 5
+python examples/td_learning_examples.py
 ```
 
-## Neuromorphic Benefits
+## Neuromorphic Modes
 
-1. **Adaptive Selection**: Neural circuits learn which operators work best online
-2. **Parallel Processing**: Population-based evaluation across dimensions
-3. **Energy Efficiency**: Designed for neuromorphic hardware (e.g., Intel Loihi 2, SpiNNaker)
-4. **Biological Inspiration**: Mimics Cortico-Basal Ganglia-Thalamic Loops
+On multimodal problems, spike-driven dynamics outperform tuned heuristics:
+
+```python
+optimiser = NEVOptimiser(
+    objective_function=rastrigin,
+    bounds=(-5.12, 5.12),
+    dimension=10,
+    operator_mode="nm_dual",
+    population_size=30,
+)
+optimiser.run(time=10.0)
+```
 
 ## Citation
 
@@ -111,17 +114,15 @@ If you use NEVO in your research, please cite:
 }
 ```
 
-## License
+## Licence
 
-MIT Licence - see [LICENCE](LICENSE) file for details.
+MIT Licence — see the [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome. Please submit a pull request.
 
 ## Related Projects
 
-- [neuroptimiser](https://github.com/jcrvz/neuroptimiser) - Original research implementation
-- [Nengo](https://www.nengo.ai/) - Neural Engineering Framework
-- [IOHexperimenter](https://iohprofiler.github.io/) - Benchmarking suite
-
+- [Nengo](https://www.nengo.ai/) — Neural Engineering Framework
+- [IOHexperimenter](https://iohprofiler.github.io/) — Benchmarking suite

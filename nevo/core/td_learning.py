@@ -20,11 +20,7 @@ class LearningRule(ABC):
 
     @abstractmethod
     def compute_update(
-        self,
-        td_error: float,
-        learning_rate: float,
-        current_value: float,
-        **kwargs
+        self, td_error: float, learning_rate: float, current_value: float, **kwargs
     ) -> float:
         """
         Compute value update from TD error.
@@ -61,11 +57,7 @@ class SimpleTDRule(LearningRule):
     """
 
     def compute_update(
-        self,
-        td_error: float,
-        learning_rate: float,
-        current_value: float,
-        **kwargs
+        self, td_error: float, learning_rate: float, current_value: float, **kwargs
     ) -> float:
         """Direct proportional update to TD error."""
         return learning_rate * td_error
@@ -101,7 +93,7 @@ class DecayingTDRule(LearningRule):
         learning_rate: float,
         current_value: float,
         timestep: int = 0,
-        **kwargs
+        **kwargs,
     ) -> float:
         """Update with decay applied based on history depth."""
         if self.decay_type == "constant":
@@ -109,7 +101,7 @@ class DecayingTDRule(LearningRule):
         elif self.decay_type == "linear":
             decay_factor = max(0.0, 1.0 - (timestep * self.decay_rate))
         elif self.decay_type == "exponential":
-            decay_factor = self.decay_rate ** timestep
+            decay_factor = self.decay_rate**timestep
         else:
             decay_factor = 1.0
 
@@ -137,11 +129,7 @@ class ConservativeTDRule(LearningRule):
         self.stability_weight = stability_weight
 
     def compute_update(
-        self,
-        td_error: float,
-        learning_rate: float,
-        current_value: float,
-        **kwargs
+        self, td_error: float, learning_rate: float, current_value: float, **kwargs
     ) -> float:
         """Damped update with stability."""
         # Dampen the TD error by stability weight
@@ -177,11 +165,7 @@ class AdaptiveTDRule(LearningRule):
         self.error_history = []
 
     def compute_update(
-        self,
-        td_error: float,
-        learning_rate: float,
-        current_value: float,
-        **kwargs
+        self, td_error: float, learning_rate: float, current_value: float, **kwargs
     ) -> float:
         """Update with adaptive learning rate."""
         self.error_history.append(abs(td_error))
@@ -287,7 +271,7 @@ class BoundedValueModel(ValueModel):
         initial_value: float = 0.5,
         min_bound: float = 0.1,
         max_bound: float = 5.0,
-        adapt_bounds: bool = True
+        adapt_bounds: bool = True,
     ):
         """
         Parameters
@@ -318,18 +302,14 @@ class BoundedValueModel(ValueModel):
     def set_value(self, operator_idx: int, value: float):
         """Set value for operator."""
         self.values[operator_idx] = np.clip(
-            value,
-            self.min_bounds[operator_idx],
-            self.max_bounds[operator_idx]
+            value, self.min_bounds[operator_idx], self.max_bounds[operator_idx]
         )
 
     def update(self, operator_idx: int, delta: float):
         """Update value by delta with bounds checking."""
         new_value = self.values[operator_idx] + delta
         self.values[operator_idx] = np.clip(
-            new_value,
-            self.min_bounds[operator_idx],
-            self.max_bounds[operator_idx]
+            new_value, self.min_bounds[operator_idx], self.max_bounds[operator_idx]
         )
 
     def adapt_bounds(self, operator_idx: int, window_size: int = 20):
@@ -337,7 +317,7 @@ class BoundedValueModel(ValueModel):
         if not self.adapt_bounds or len(self.min_history[operator_idx]) < 5:
             return
 
-        recent_values = self.values[operator_idx:operator_idx+1]
+        recent_values = self.values[operator_idx : operator_idx + 1]
 
         # Gradually widen bounds if values approach limits
         min_val = np.percentile(recent_values, 10)
@@ -348,8 +328,12 @@ class BoundedValueModel(ValueModel):
         new_max = min(10.0, max_val + margin)
 
         # Smooth transition to new bounds
-        self.min_bounds[operator_idx] = 0.9 * self.min_bounds[operator_idx] + 0.1 * new_min
-        self.max_bounds[operator_idx] = 0.9 * self.max_bounds[operator_idx] + 0.1 * new_max
+        self.min_bounds[operator_idx] = (
+            0.9 * self.min_bounds[operator_idx] + 0.1 * new_min
+        )
+        self.max_bounds[operator_idx] = (
+            0.9 * self.max_bounds[operator_idx] + 0.1 * new_max
+        )
 
     def reset(self):
         """Reset all values to initial."""
@@ -370,10 +354,7 @@ class EligibilityTraceManager:
     """
 
     def __init__(
-        self,
-        n_operators: int,
-        lambda_coeff: float = 0.9,
-        trace_decay: float = 0.99
+        self, n_operators: int, lambda_coeff: float = 0.9, trace_decay: float = 0.99
     ):
         """
         Parameters
@@ -556,7 +537,7 @@ class TemporalDifferenceLearner:
                     self.learning_rate,
                     self.value_model.get_value(i),
                     timestep=self.timestep,
-                    trace=traces[i]
+                    trace=traces[i],
                 )
                 self.value_model.update(i, delta * traces[i])
                 updates[i] = delta * traces[i]
@@ -604,4 +585,3 @@ class TemporalDifferenceLearner:
             "max_td_error": float(np.max(recent_errors)),
             "min_td_error": float(np.min(recent_errors)),
         }
-

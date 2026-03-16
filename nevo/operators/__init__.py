@@ -71,7 +71,9 @@ def get_operator(name: str, **kwargs) -> Operator:
         Instantiated operator
     """
     if name not in OPERATOR_REGISTRY:
-        raise ValueError(f"Unknown operator: {name}. Available: {list(OPERATOR_REGISTRY.keys())}")
+        raise ValueError(
+            f"Unknown operator: {name}. Available: {list(OPERATOR_REGISTRY.keys())}"
+        )
 
     return OPERATOR_REGISTRY[name](**kwargs)
 
@@ -90,10 +92,9 @@ def list_operators() -> Dict[str, str]:
         # Get first line of docstring
         doc = op_class.__doc__
         if doc:
-            summary = doc.strip().split('\n')[0]
+            summary = doc.strip().split("\n")[0]
             result[name] = summary
         else:
             result[name] = "No description available"
 
     return result
-

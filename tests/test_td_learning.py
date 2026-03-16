@@ -8,7 +8,6 @@ Tests TD(0), TD(λ), and pluggable learning rules/value models in basal ganglia.
 
 import numpy as np
 import sys
-from typing import List
 
 # Test imports
 try:
@@ -22,8 +21,9 @@ try:
         BoundedValueModel,
         EligibilityTraceManager,
     )
-    from nevo.core.basal_ganglia import BasalGangliaSelector, UtilityFunction
+    from nevo.core.basal_ganglia import BasalGangliaSelector
     from nevo.operators.base import Operator
+
     print("✓ All imports successful")
 except ImportError as e:
     print(f"✗ Import error: {e}")
@@ -76,7 +76,9 @@ def test_decaying_td_rule():
 
     updates = []
     for t in range(5):
-        update = rule_exp.compute_update(td_error, learning_rate, current_value, timestep=t)
+        update = rule_exp.compute_update(
+            td_error, learning_rate, current_value, timestep=t
+        )
         updates.append(update)
         print(f"  Timestep {t}: update = {update:.6f}")
 
@@ -86,7 +88,9 @@ def test_decaying_td_rule():
 
     # Linear decay
     rule_lin = DecayingTDRule(decay_type="linear", decay_rate=0.2)
-    update_lin = rule_lin.compute_update(td_error, learning_rate, current_value, timestep=2)
+    update_lin = rule_lin.compute_update(
+        td_error, learning_rate, current_value, timestep=2
+    )
     print(f"✓ DecayingTDRule linear decay: update = {update_lin:.6f}")
 
 
@@ -164,11 +168,7 @@ def test_bounded_value_model():
     print("\n=== Test BoundedValueModel ===")
     n_ops = 3
     model = BoundedValueModel(
-        n_ops,
-        initial_value=0.5,
-        min_bound=0.2,
-        max_bound=2.0,
-        adapt_bounds=False
+        n_ops, initial_value=0.5, min_bound=0.2, max_bound=2.0, adapt_bounds=False
     )
 
     values = model.get_values_array()
@@ -225,9 +225,11 @@ def test_temporal_difference_learner_td0():
     next_values = learner.get_values()
     next_state_value = np.max(next_values)
 
-    update_info = learner.update(operator_idx, reward, next_state_value, is_terminal=False)
+    update_info = learner.update(
+        operator_idx, reward, next_state_value, is_terminal=False
+    )
 
-    print(f"✓ TD(0) update info:")
+    print("✓ TD(0) update info:")
     print(f"  TD error: {update_info['td_error']:.6f}")
     print(f"  TD target: {update_info['td_target']:.6f}")
     print(f"  Updated values: {learner.get_values()}")
@@ -318,7 +320,7 @@ def test_basal_ganglia_selector_with_td():
 
     # Dynamic lambda adjustment
     selector.set_td_lambda(0.9)
-    print(f"✓ Set TD lambda to 0.9")
+    print("✓ Set TD lambda to 0.9")
 
 
 def test_dynamic_rule_switching():
@@ -334,17 +336,17 @@ def test_dynamic_rule_switching():
         learning_rule=SimpleTDRule(),
     )
 
-    print(f"✓ Initial rule: SimpleTDRule")
+    print("✓ Initial rule: SimpleTDRule")
 
     # Switch to conservative rule
     conservative_rule = ConservativeTDRule(stability_weight=0.5)
     selector.set_learning_rule(conservative_rule)
-    print(f"✓ Switched to: ConservativeTDRule")
+    print("✓ Switched to: ConservativeTDRule")
 
     # Switch to adaptive rule
     adaptive_rule = AdaptiveTDRule(window_size=10)
     selector.set_learning_rule(adaptive_rule)
-    print(f"✓ Switched to: AdaptiveTDRule")
+    print("✓ Switched to: AdaptiveTDRule")
 
 
 def test_dynamic_value_model_switching():
@@ -359,19 +361,19 @@ def test_dynamic_value_model_switching():
         value_model=LinearValueModel(2),
     )
 
-    print(f"✓ Initial model: LinearValueModel")
+    print("✓ Initial model: LinearValueModel")
 
     # Switch to bounded model
     bounded_model = BoundedValueModel(2, min_bound=0.3, max_bound=3.0)
     selector.set_value_model(bounded_model)
-    print(f"✓ Switched to: BoundedValueModel")
+    print("✓ Switched to: BoundedValueModel")
 
 
 def main():
     """Run all tests."""
-    print("="*60)
+    print("=" * 60)
     print("Testing Temporal Difference Learning Implementation")
-    print("="*60)
+    print("=" * 60)
 
     try:
         # Test learning rules
@@ -396,23 +398,24 @@ def main():
         test_dynamic_rule_switching()
         test_dynamic_value_model_switching()
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("✓ ALL TESTS PASSED")
-        print("="*60)
+        print("=" * 60)
         return 0
 
     except AssertionError as e:
         print(f"\n✗ TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
     except Exception as e:
         print(f"\n✗ ERROR: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
 
 if __name__ == "__main__":
     sys.exit(main())
-

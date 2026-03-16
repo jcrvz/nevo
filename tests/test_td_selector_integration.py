@@ -19,9 +19,9 @@ from nevo.operators.standard import LevyFlight, ParticleSwarm, SpiralOptimisatio
 
 def test_td0_basic():
     """Test TD(0) learning basic functionality."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 1: TD(0) Learning Basic")
-    print("="*70)
+    print("=" * 70)
 
     operators = [LevyFlight(), ParticleSwarm(), SpiralOptimisation()]
 
@@ -47,7 +47,7 @@ def test_td0_basic():
     for i in range(5):
         # Random operator selection signal
         op_signal = np.random.rand(len(operators))
-        op_signal /= (np.sum(op_signal) + 1e-8)
+        op_signal /= np.sum(op_signal) + 1e-8
 
         fitness_improved = i > 0 and i % 2 == 0
         fitness = 10.0 - (i if fitness_improved else 0)
@@ -67,9 +67,9 @@ def test_td0_basic():
 
 def test_td_lambda():
     """Test TD(λ) learning."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 2: TD(λ) Learning")
-    print("="*70)
+    print("=" * 70)
 
     operators = [LevyFlight(), ParticleSwarm()]
 
@@ -110,9 +110,9 @@ def test_td_lambda():
 
 def test_rule_switching():
     """Test dynamic learning rule switching."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 3: Dynamic Rule Switching")
-    print("="*70)
+    print("=" * 70)
 
     operators = [LevyFlight(), ParticleSwarm()]
 
@@ -143,9 +143,9 @@ def test_rule_switching():
 
 def test_value_model_switching():
     """Test dynamic value model switching."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 4: Dynamic Value Model Switching")
-    print("="*70)
+    print("=" * 70)
 
     operators = [LevyFlight(), ParticleSwarm()]
 
@@ -190,9 +190,9 @@ def test_value_model_switching():
 
 def test_parameter_monitoring():
     """Test monitoring TD parameters."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 5: Parameter Monitoring")
-    print("="*70)
+    print("=" * 70)
 
     operators = [LevyFlight(), ParticleSwarm(), SpiralOptimisation()]
 
@@ -226,9 +226,9 @@ def test_parameter_monitoring():
 
 def test_backward_compatibility():
     """Test that TD can be disabled."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 6: Backward Compatibility")
-    print("="*70)
+    print("=" * 70)
 
     operators = [LevyFlight(), ParticleSwarm()]
 
@@ -256,9 +256,9 @@ def test_backward_compatibility():
 
 def test_lambda_switching():
     """Test dynamic λ switching."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TEST 7: Dynamic Lambda Switching")
-    print("="*70)
+    print("=" * 70)
 
     operators = [LevyFlight(), ParticleSwarm()]
 
@@ -287,9 +287,9 @@ def test_lambda_switching():
 
 def main():
     """Run all tests."""
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("TD Learning Integration Tests - BasalGangliaSelector")
-    print("="*70)
+    print("=" * 70)
 
     try:
         test_td0_basic()
@@ -300,24 +300,26 @@ def main():
         test_backward_compatibility()
         test_lambda_switching()
 
-        print("\n" + "="*70)
+        print("\n" + "=" * 70)
         print("✓✓✓ ALL INTEGRATION TESTS PASSED ✓✓✓")
-        print("="*70)
+        print("=" * 70)
         return 0
 
     except AssertionError as e:
         print(f"\n✗ TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
     except Exception as e:
         print(f"\n✗ ERROR: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 
 
 if __name__ == "__main__":
     import sys
-    sys.exit(main())
 
+    sys.exit(main())

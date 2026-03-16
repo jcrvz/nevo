@@ -114,7 +114,7 @@ def test_neuromorphic_dual_mode():
         dimension=5,
         population_size=8,
         memory_size=6,
-        operator_mode="neuromorphic_dual",
+        operator_mode="nm_dual",
         seed=7,
     )
 
@@ -137,7 +137,7 @@ def test_neuromorphic_soft_mix_mode():
         dimension=5,
         population_size=8,
         memory_size=6,
-        operator_mode="neuromorphic_soft_mix",
+        operator_mode="nm_softmix",
         seed=11,
     )
 

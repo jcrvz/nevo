@@ -29,11 +29,13 @@ class Operator(ABC):
     - 7-10: Physics/swarm-based operators
     """
 
-    def __init__(self,
-                 name: str,
-                 operator_type: str = "exploration",
-                 short_name: Optional[str] = None,
-                 complexity: int = 5):
+    def __init__(
+        self,
+        name: str,
+        operator_type: str = "exploration",
+        short_name: Optional[str] = None,
+        complexity: int = 5,
+    ):
         """
         Initialize operator.
 
@@ -60,13 +62,9 @@ class Operator(ABC):
         else:
             self.short_name = short_name
 
-
     @abstractmethod
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """
         Generate a population of candidate solutions.
@@ -130,21 +128,26 @@ class Operator(ABC):
 class ExplorationOperator(Operator):
     """Base class for exploration operators (global search)."""
 
-    def __init__(self, name: str,
-                 short_name: Optional[str] = None,
-                 complexity: int = 5):
-        super().__init__(name, short_name=short_name,
-                         operator_type="exploration",
-                         complexity=complexity)
+    def __init__(
+        self, name: str, short_name: Optional[str] = None, complexity: int = 5
+    ):
+        super().__init__(
+            name,
+            short_name=short_name,
+            operator_type="exploration",
+            complexity=complexity,
+        )
 
 
 class ExploitationOperator(Operator):
     """Base class for exploitation operators (local refinement)."""
 
-    def __init__(self, name: str,
-                 short_name: Optional[str] = None,
-                 complexity: int = 5):
-        super().__init__(name, short_name=short_name,
-                         operator_type="exploitation",
-                         complexity=complexity)
-
+    def __init__(
+        self, name: str, short_name: Optional[str] = None, complexity: int = 5
+    ):
+        super().__init__(
+            name,
+            short_name=short_name,
+            operator_type="exploitation",
+            complexity=complexity,
+        )

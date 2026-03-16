@@ -23,12 +23,12 @@ from nevo import NEVOptimiser
 
 
 def sphere(x: np.ndarray) -> float:
-    return float(np.sum(x ** 2))
+    return float(np.sum(x**2))
 
 
 def rastrigin(x: np.ndarray) -> float:
     n = x.shape[0]
-    return float(10.0 * n + np.sum(x ** 2 - 10.0 * np.cos(2.0 * math.pi * x)))
+    return float(10.0 * n + np.sum(x**2 - 10.0 * np.cos(2.0 * math.pi * x)))
 
 
 def run_single(
@@ -71,7 +71,7 @@ def run_single(
         operator_mode = "nm_dual"
     elif mode == "nm_softmix_eps_greedy":
         operator_mode = "nm_softmix"
-    else: # mode == "trad_eps_greedy":
+    else:  # mode == "trad_eps_greedy":
         operator_mode = "trad"
 
     optimiser = NEVOptimiser(
@@ -86,7 +86,11 @@ def run_single(
         seed=seed,
     )
     optimiser.run(time=sim_time, verbose=False)
-    return float(optimiser.state["best_f"]) if optimiser.state["best_f"] is not None else float("inf")
+    return (
+        float(optimiser.state["best_f"])
+        if optimiser.state["best_f"] is not None
+        else float("inf")
+    )
 
 
 def benchmark(
@@ -117,7 +121,14 @@ def benchmark(
 def write_csv(rows: List[Dict[str, float]], out_csv: str) -> None:
     if not rows:
         return
-    fieldnames = ["problem", "mode", "mean_best_f", "std_best_f", "min_best_f", "max_best_f"]
+    fieldnames = [
+        "problem",
+        "mode",
+        "mean_best_f",
+        "std_best_f",
+        "min_best_f",
+        "max_best_f",
+    ]
     with open(out_csv, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -127,7 +138,9 @@ def write_csv(rows: List[Dict[str, float]], out_csv: str) -> None:
 def print_table(rows: List[Dict[str, float]]) -> None:
     print("\nBenchmark Results")
     print("-" * 92)
-    print(f"{'problem':12s} {'mode':28s} {'mean_best_f':14s} {'std_best_f':14s} {'min_best_f':14s}")
+    print(
+        f"{'problem':12s} {'mode':28s} {'mean_best_f':14s} {'std_best_f':14s} {'min_best_f':14s}"
+    )
     print("-" * 92)
     for r in rows:
         print(
@@ -142,8 +155,14 @@ def main() -> None:
     parser.add_argument("--dimension", type=int, default=10)
     parser.add_argument("--time", type=float, default=1.0, dest="sim_time")
     parser.add_argument("--reps", type=int, default=3)
-    parser.add_argument("--seed", "--seeds", type=int, default=None,
-                        dest="seed", help="Single seed value (overrides --reps)")
+    parser.add_argument(
+        "--seed",
+        "--seeds",
+        type=int,
+        default=None,
+        dest="seed",
+        help="Single seed value (overrides --reps)",
+    )
     parser.add_argument("--out", type=str, default="operator_mode_benchmark.csv")
     args = parser.parse_args()
 
@@ -182,6 +201,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-

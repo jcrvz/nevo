@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """
-Integration Test: TD Learning with NEVO Optimiser
-================================================
+Integration Test: TD Learning with NEVO Optimiser — Neuromorphic Modes
+=======================================================================
 
-Complete end-to-end test of TD learning integrated with NEVO.
+All primary tests run in ``nm_dual`` or ``nm_softmix`` operator mode so that
+TD learning is exercised alongside the actual Nengo LIF spike ensembles rather
+than the traditional Python heuristics.
+
+Architecture reminder
+---------------------
+The Nengo basal-ganglia (BG) circuit produces the action-selection signal
+**inside** the simulation; the TD learner is a Python-side module that reads
+that signal and biases utility weights fed back into the same BG circuit on
+the next timestep.  The coupling point is ``BasalGangliaSelector.select_operator()``.
+
+The traditional (``trad``) mode is exercised only in ``test_backward_compatibility``
+so there is an explicit non-neuromorphic baseline.
 """
 
 import numpy as np
@@ -14,320 +26,310 @@ from nevo.core.td_learning import (
     LinearValueModel,
     BoundedValueModel,
 )
+from nevo.operators.standard import (
+    NeuromorphicExplorationEnsemble,
+    NeuromorphicExploitationEnsemble,
+)
+
+_SEG = 0.1   # seconds per simulation segment — short but covers many timesteps
 
 
-def test_td0_with_optimiser():
-    """Test TD(0) learning integrated with optimiser."""
-    print("\n" + "="*70)
-    print("TEST 1: TD(0) Learning with NEVOptimiser")
-    print("="*70)
+def sphere_function(x):
+    return float(np.sum(x**2))
 
-    def sphere_function(x):
-        return np.sum(x**2)
 
-    # Create optimiser with TD(0) learning
-    optimizer = NEVOptimiser(
-        objective_function=sphere_function,
-        bounds=(np.array([-5.0, -5.0]), np.array([5.0, 5.0])),
-        dimension=2,
+def rosenbrock_function(x):
+    return float(sum(
+        100.0 * (x[i + 1] - x[i] ** 2) ** 2 + (1 - x[i]) ** 2
+        for i in range(len(x) - 1)
+    ))
+
+
+def _best(opt: NEVOptimiser) -> float:
+    f = opt.state.get("best_f")
+    return f if f is not None else float("inf")
+
+
+def _nm_dual_opt(objective=sphere_function, dimension=2, seed=42, bounds=None, learning_rate=0.1, **extra) -> NEVOptimiser:
+    """Factory: nm_dual optimiser with sensible defaults for fast testing."""
+    if bounds is None:
+        bounds = (np.full(dimension, -5.0), np.full(dimension, 5.0))
+    return NEVOptimiser(
+        objective_function=objective,
+        bounds=bounds,
+        dimension=dimension,
         population_size=20,
         memory_size=10,
         neurons_per_ensemble=100,
-        epsilon=0.1,
-        learning_rate=0.1,
-        seed=42,
+        operator_mode="nm_dual",
+        td_enabled=True,
+        learning_rate=learning_rate,
+        seed=seed,
+        **extra,
     )
 
-    # Start episode
-    optimizer.bg_selector.begin_episode()
 
-    print(f"✓ Optimiser created with TD learning enabled")
-    print(f"✓ Number of operators: {len(optimizer.bg_selector.operators)}")
-    print(f"✓ TD learning enabled: {optimizer.bg_selector.td_enabled}")
-    print(f"✓ λ coefficient: {optimizer.bg_selector.td_learner.lambda_coeff}")
-
-    # Run optimization
-    best_fitness_history = []
-    for i in range(5):
-        best_fitness = optimizer.run(time=0.1)
-        best_fitness_history.append(best_fitness)
-
-        if i % 2 == 0:
-            td_values = optimizer.bg_selector.get_td_values()
-            print(f"  Iteration {i}: fitness={best_fitness:.6f}, TD values={td_values}")
-
-    # Verify TD learning occurred
-    initial_values = np.full(len(optimizer.bg_selector.operators), 0.5)
-    final_values = optimizer.bg_selector.get_td_values()
-
-    has_changed = not np.allclose(initial_values, final_values, atol=1e-6)
-    assert has_changed, "TD values did not change - learning not working!"
-
-    print(f"\n✓ TD values changed: {initial_values} → {final_values}")
-    print("✓ TEST 1 PASSED")
+# ---------------------------------------------------------------------------
+# Helper: assert both LIF ensembles were wired by build_network()
+# ---------------------------------------------------------------------------
+def _assert_lif_ensembles_built(opt: NEVOptimiser) -> None:
+    """Raise AssertionError if Nengo LIF ensembles were not built."""
+    explore_op = next(
+        (op for op in opt.operators if isinstance(op, NeuromorphicExplorationEnsemble)),
+        None,
+    )
+    exploit_op = next(
+        (op for op in opt.operators if isinstance(op, NeuromorphicExploitationEnsemble)),
+        None,
+    )
+    assert explore_op is not None, "NeuromorphicExplorationEnsemble not found"
+    assert exploit_op is not None, "NeuromorphicExploitationEnsemble not found"
+    assert explore_op._nengo_ensemble is not None, \
+        "Exploration LIF ensemble was never built (build_network not called)"
+    assert exploit_op._nengo_ensemble is not None, \
+        "Exploitation LIF ensemble was never built (build_network not called)"
 
 
-def test_td_lambda_with_optimiser():
-    """Test TD(λ) learning integrated with optimiser."""
-    print("\n" + "="*70)
-    print("TEST 2: TD(λ) Learning with NEVOptimiser")
-    print("="*70)
+# ===========================================================================
+# Test 1 — TD(0) with nm_dual: values must deviate from their 0.5 initialisation
+# ===========================================================================
+def test_td0_nm_dual_mode():
+    """TD(0) values change from 0.5 after spike-driven optimisation in nm_dual mode."""
+    opt = _nm_dual_opt(td_lambda=0.0)
 
-    def rosenbrock_function(x):
-        return sum(100.0 * (x[i+1] - x[i]**2)**2 + (1 - x[i])**2
-                   for i in range(len(x) - 1))
+    assert opt.bg_selector.td_enabled
+    assert opt.bg_selector.td_learner.lambda_coeff == 0.0
+    assert len(opt.operators) == 2
 
-    optimizer = NEVOptimiser(
-        objective_function=rosenbrock_function,
+    initial_values = opt.bg_selector.get_td_values().copy()
+
+    fitness_history = []
+    for _ in range(3):
+        opt.run(time=_SEG, verbose=False)
+        fitness_history.append(_best(opt))
+
+    _assert_lif_ensembles_built(opt)
+
+    final_values = opt.bg_selector.get_td_values()
+    assert not np.allclose(initial_values, final_values, atol=1e-6), \
+        "TD values did not change — learning not working in nm_dual mode!"
+    assert all(f < float("inf") for f in fitness_history)
+
+
+# ===========================================================================
+# Test 2 — TD(λ=0.9) with nm_dual: eligibility traces through spike operators
+# ===========================================================================
+def test_td_lambda_nm_dual_mode():
+    """TD(λ=0.9) accumulates statistics after running through LIF spike operators."""
+    opt = _nm_dual_opt(
+        objective=rosenbrock_function,
         bounds=(np.array([-2.0, -2.0]), np.array([2.0, 2.0])),
+        td_lambda=0.9,
+    )
+
+    assert opt.bg_selector.td_learner.lambda_coeff == 0.9
+
+    for _ in range(3):
+        opt.run(time=_SEG, verbose=False)
+
+    _assert_lif_ensembles_built(opt)
+
+    stats = opt.bg_selector.get_td_statistics()
+    assert "mean_td_error" in stats
+    assert "std_td_error" in stats
+    assert _best(opt) < float("inf")
+
+
+# ===========================================================================
+# Test 3 — Dynamic rule switching: values remain finite across rule changes
+# ===========================================================================
+def test_dynamic_rule_switching_nm_dual():
+    """TD values persist and stay finite when switching rules mid-run (nm_dual)."""
+    opt = _nm_dual_opt()
+
+    # Phase 1 — SimpleTDRule
+    opt.bg_selector.set_learning_rule(SimpleTDRule())
+    opt.run(time=_SEG, verbose=False)
+    values_simple = opt.bg_selector.get_td_values().copy()
+
+    # Phase 2 — switch to ConservativeTDRule on the live optimiser
+    opt.bg_selector.set_learning_rule(ConservativeTDRule(stability_weight=0.5))
+    opt.run(time=_SEG, verbose=False)
+    values_conservative = opt.bg_selector.get_td_values()
+
+    _assert_lif_ensembles_built(opt)
+
+    assert len(values_simple) == 2
+    assert np.all(np.isfinite(values_simple))
+    assert len(values_conservative) == 2
+    assert np.all(np.isfinite(values_conservative))
+
+
+# ===========================================================================
+# Test 4 — Dynamic value-model switching: BoundedValueModel respects [0.2, 2.0]
+# ===========================================================================
+def test_dynamic_value_model_switching_nm_dual():
+    """BoundedValueModel keeps all 2 operator values within [0.2, 2.0] (nm_dual)."""
+    opt = _nm_dual_opt(learning_rate=0.2)
+    n_ops = len(opt.bg_selector.operators)  # 2 in nm_dual
+
+    # Phase 1 — LinearValueModel
+    opt.bg_selector.set_value_model(LinearValueModel(n_ops))
+    opt.run(time=_SEG, verbose=False)
+    opt.run(time=_SEG, verbose=False)
+    assert np.all(np.isfinite(opt.bg_selector.get_td_values()))
+
+    # Phase 2 — BoundedValueModel
+    opt.bg_selector.set_value_model(
+        BoundedValueModel(n_operators=n_ops, min_bound=0.2, max_bound=2.0, adapt_bounds=True)
+    )
+    opt.run(time=_SEG, verbose=False)
+    opt.run(time=_SEG, verbose=False)
+    bounded = opt.bg_selector.get_td_values()
+
+    _assert_lif_ensembles_built(opt)
+
+    assert np.all(bounded >= 0.2), f"Values below minimum bound: {bounded}"
+    assert np.all(bounded <= 2.0), f"Values above maximum bound: {bounded}"
+
+
+# ===========================================================================
+# Test 5 — Monitoring APIs return complete, finite data in nm_dual mode
+# ===========================================================================
+def test_parameter_monitoring_nm_dual():
+    """get_td_values / get_utility_weights / get_td_statistics all return valid data."""
+    opt = _nm_dual_opt()
+
+    for _ in range(3):
+        opt.run(time=_SEG, verbose=False)
+
+    _assert_lif_ensembles_built(opt)
+
+    td_values = opt.bg_selector.get_td_values()
+    utility_weights = opt.bg_selector.get_utility_weights()
+    stats = opt.bg_selector.get_td_statistics()
+
+    assert len(td_values) == 2
+    assert np.all(np.isfinite(td_values))
+
+    assert len(utility_weights) == 2
+    assert all(isinstance(v, float) for v in utility_weights.values())
+
+    assert "mean_td_error" in stats
+    assert "std_td_error" in stats
+    assert np.isfinite(stats["mean_td_error"])
+
+
+# ===========================================================================
+# Test 6 — nm_softmix: blended spike populations + TD run end-to-end
+# ===========================================================================
+def test_nm_softmix_td_integration():
+    """nm_softmix mode with TD(0): softmax-blended LIF ensembles and learning."""
+    opt = NEVOptimiser(
+        objective_function=sphere_function,
+        bounds=(-5.0, 5.0),
         dimension=2,
         population_size=20,
         memory_size=10,
-        neurons_per_ensemble=100,
-        epsilon=0.1,
+        operator_mode="nm_softmix",
+        td_enabled=True,
+        td_lambda=0.0,
         learning_rate=0.1,
-        seed=42,
+        seed=7,
     )
 
-    # Switch to TD(λ)
-    optimizer.bg_selector.set_td_lambda(0.9)
-    optimizer.bg_selector.begin_episode()
+    assert len(opt.operators) == 2
 
-    print(f"✓ Switched to TD(λ) learning")
-    print(f"✓ λ = {optimizer.bg_selector.td_learner.lambda_coeff}")
+    initial_values = opt.bg_selector.get_td_values().copy()
 
-    # Run optimization
-    for i in range(5):
-        best_fitness = optimizer.optimize(num_iterations=1)
+    for _ in range(3):
+        opt.run(time=_SEG, verbose=False)
 
-        if i % 2 == 0:
-            stats = optimizer.bg_selector.get_td_statistics()
-            print(f"  Iteration {i}: fitness={best_fitness:.6f}, "
-                  f"mean_td_error={stats.get('mean_td_error', 0.0):.6f}")
+    _assert_lif_ensembles_built(opt)
 
-    print("✓ TEST 2 PASSED")
+    # Both operators should be called (softmix always blends both populations)
+    counts = opt.state["operator_counts"]
+    assert all(c > 0 for c in counts.values()), \
+        f"Some operators never called in nm_softmix: {counts}"
+
+    # TD values must have shifted from their initial state
+    final_values = opt.bg_selector.get_td_values()
+    assert not np.allclose(initial_values, final_values, atol=1e-6), \
+        "TD values did not change in nm_softmix mode"
 
 
-def test_dynamic_rule_switching():
-    """Test dynamic rule switching during optimization."""
-    print("\n" + "="*70)
-    print("TEST 3: Dynamic Learning Rule Switching")
-    print("="*70)
+# ===========================================================================
+# Test 7 — nm_dual operator usage: BG circuit drives non-trivial selection
+# ===========================================================================
+def test_nm_dual_operator_selection_is_non_trivial():
+    """Both LIF operators must be selected at least once over the run."""
+    opt = _nm_dual_opt(epsilon=0.2, seed=99)
 
-    def sphere_function(x):
-        return np.sum(x**2)
+    opt.run(time=0.3, verbose=False)
 
-    optimizer = NEVOptimiser(
+    counts = opt.state["operator_counts"]
+    assert all(c > 0 for c in counts.values()), \
+        f"Basal ganglia never selected one of the operators: {counts}"
+
+
+# ===========================================================================
+# Test 8 — Backward compatibility: trad mode + td_enabled=False (non-neuromorphic)
+# ===========================================================================
+def test_backward_compatibility_trad_no_td():
+    """Traditional operators with td_enabled=False still run and produce a result."""
+    opt = NEVOptimiser(
         objective_function=sphere_function,
         bounds=(np.array([-5.0, -5.0]), np.array([5.0, 5.0])),
         dimension=2,
         population_size=20,
         memory_size=10,
         neurons_per_ensemble=100,
-        epsilon=0.1,
-        learning_rate=0.1,
+        operator_mode="trad",
+        td_enabled=False,
         seed=42,
     )
 
-    optimizer.bg_selector.begin_episode()
+    assert not opt.bg_selector.td_enabled
 
-    # Phase 1: Simple rule
-    print("  Phase 1: SimpleTDRule")
-    optimizer.bg_selector.set_learning_rule(SimpleTDRule())
-    optimizer.optimize(num_iterations=1)
-    print("  ✓ SimpleTDRule working")
+    for _ in range(3):
+        opt.run(time=_SEG, verbose=False)
 
-    # Phase 2: Conservative rule
-    print("  Phase 2: ConservativeTDRule")
-    optimizer.bg_selector.set_learning_rule(
-        ConservativeTDRule(stability_weight=0.5)
-    )
-    optimizer.optimize(num_iterations=1)
-    print("  ✓ ConservativeTDRule working")
+    assert _best(opt) < float("inf"), "Optimiser must produce a finite solution"
 
-    # Verify both rules are functional
-    td_values = optimizer.bg_selector.get_td_values()
-    assert td_values is not None and len(td_values) > 0
-
-    print("✓ TEST 3 PASSED")
+    # TD values stay at their sentinel 0.5 because learning is off
+    td_values = opt.bg_selector.get_td_values()
+    assert np.allclose(td_values, 0.5), \
+        "TD values should remain 0.5 when TD is disabled!"
 
 
-def test_dynamic_value_model_switching():
-    """Test dynamic value model switching during optimization."""
-    print("\n" + "="*70)
-    print("TEST 4: Dynamic Value Model Switching")
-    print("="*70)
-
-    def sphere_function(x):
-        return np.sum(x**2)
-
-    optimizer = NEVOptimiser(
-        objective_function=sphere_function,
-        bounds=(np.array([-5.0, -5.0]), np.array([5.0, 5.0])),
-        dimension=2,
-        population_size=20,
-        memory_size=10,
-        neurons_per_ensemble=100,
-        epsilon=0.1,
-        learning_rate=0.2,  # Higher learning rate
-        seed=42,
-    )
-
-    optimizer.bg_selector.begin_episode()
-
-    # Phase 1: Linear model
-    print("  Phase 1: LinearValueModel")
-    optimizer.bg_selector.set_value_model(
-        LinearValueModel(len(optimizer.bg_selector.operators))
-    )
-    for _ in range(2):
-        optimizer.optimize(num_iterations=1)
-    linear_values = optimizer.bg_selector.get_td_values()
-    print(f"  ✓ Linear values: {linear_values}")
-
-    # Phase 2: Bounded model
-    print("  Phase 2: BoundedValueModel")
-    optimizer.bg_selector.set_value_model(
-        BoundedValueModel(
-            n_operators=len(optimizer.bg_selector.operators),
-            min_bound=0.2,
-            max_bound=2.0,
-            adapt_bounds=True,
-        )
-    )
-    for _ in range(2):
-        optimizer.optimize(num_iterations=1)
-    bounded_values = optimizer.bg_selector.get_td_values()
-    print(f"  ✓ Bounded values: {bounded_values}")
-
-    # Verify bounds are respected
-    assert np.all(bounded_values >= 0.2), "Values below minimum bound!"
-    assert np.all(bounded_values <= 2.0), "Values above maximum bound!"
-
-    print("✓ TEST 4 PASSED")
-
-
-def test_parameter_monitoring():
-    """Test monitoring TD learning parameters."""
-    print("\n" + "="*70)
-    print("TEST 5: Parameter Monitoring")
-    print("="*70)
-
-    def sphere_function(x):
-        return np.sum(x**2)
-
-    optimizer = NEVOptimiser(
-        objective_function=sphere_function,
-        bounds=(np.array([-5.0, -5.0]), np.array([5.0, 5.0])),
-        dimension=2,
-        population_size=20,
-        memory_size=10,
-        neurons_per_ensemble=100,
-        epsilon=0.1,
-        learning_rate=0.1,
-        seed=42,
-    )
-
-    optimizer.bg_selector.begin_episode()
-    selector = optimizer.bg_selector
-
-    # Run optimization and monitor
-    for i in range(5):
-        optimizer.optimize(num_iterations=1)
-
-        if i % 2 == 0:
-            # Get various statistics
-            td_values = selector.get_td_values()
-            utility_weights = selector.get_utility_weights()
-            stats = selector.get_td_statistics()
-
-            print(f"\n  Iteration {i}:")
-            print(f"    TD values: {td_values}")
-            print(f"    Utility weights: {utility_weights}")
-            print(f"    TD stats: {stats}")
-
-            # Verify all metrics are present and reasonable
-            assert len(td_values) > 0
-            assert len(utility_weights) > 0
-            if stats:
-                assert 'mean_td_error' in stats
-                assert 'std_td_error' in stats
-
-    print("\n✓ TEST 5 PASSED")
-
-
-def test_backward_compatibility():
-    """Test backward compatibility (can disable TD learning)."""
-    print("\n" + "="*70)
-    print("TEST 6: Backward Compatibility")
-    print("="*70)
-
-    def sphere_function(x):
-        return np.sum(x**2)
-
-    # Create optimiser and disable TD learning
-    optimizer = NEVOptimiser(
-        objective_function=sphere_function,
-        bounds=(np.array([-5.0, -5.0]), np.array([5.0, 5.0])),
-        dimension=2,
-        population_size=20,
-        memory_size=10,
-        neurons_per_ensemble=100,
-        epsilon=0.1,
-        learning_rate=0.1,
-        seed=42,
-    )
-
-    # Disable TD learning
-    optimizer.bg_selector.td_enabled = False
-    optimizer.bg_selector.begin_episode()
-
-    print(f"✓ TD learning disabled: {not optimizer.bg_selector.td_enabled}")
-
-    # Run optimization (should still work)
-    for i in range(3):
-        best_fitness = optimizer.optimize(num_iterations=1)
-        print(f"  Iteration {i}: fitness={best_fitness:.6f}")
-
-    # TD values should be defaults
-    td_values = optimizer.bg_selector.get_td_values()
-    assert np.allclose(td_values, 0.5), "TD values should be default when disabled!"
-
-    print("✓ TEST 6 PASSED - Backward compatible")
-
-
+# ---------------------------------------------------------------------------
 def main():
-    """Run all integration tests."""
-    print("\n" + "="*70)
-    print("NEVO TD Learning Integration Tests")
-    print("="*70)
+    tests = [
+        test_td0_nm_dual_mode,
+        test_td_lambda_nm_dual_mode,
+        test_dynamic_rule_switching_nm_dual,
+        test_dynamic_value_model_switching_nm_dual,
+        test_parameter_monitoring_nm_dual,
+        test_nm_softmix_td_integration,
+        test_nm_dual_operator_selection_is_non_trivial,
+        test_backward_compatibility_trad_no_td,
+    ]
+    passed = 0
+    for fn in tests:
+        try:
+            fn()
+            print(f"✓  {fn.__name__}")
+            passed += 1
+        except Exception as e:
+            import traceback
+            print(f"✗  {fn.__name__}: {e}")
+            traceback.print_exc()
 
-    try:
-        test_td0_with_optimiser()
-        test_td_lambda_with_optimiser()
-        test_dynamic_rule_switching()
-        test_dynamic_value_model_switching()
-        test_parameter_monitoring()
-        test_backward_compatibility()
-
-        print("\n" + "="*70)
-        print("✓✓✓ ALL INTEGRATION TESTS PASSED ✓✓✓")
-        print("="*70)
-        return 0
-
-    except AssertionError as e:
-        print(f"\n✗ TEST FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
-    except Exception as e:
-        print(f"\n✗ ERROR: {e}")
-        import traceback
-        traceback.print_exc()
-        return 1
+    print(f"\n{passed}/{len(tests)} tests passed")
+    return 0 if passed == len(tests) else 1
 
 
 if __name__ == "__main__":
     import sys
-    sys.exit(main())
 
+    sys.exit(main())

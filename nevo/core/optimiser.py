@@ -278,36 +278,30 @@ class NEVOptimiser:
                 self.state["state_features"] = features
                 return features
 
-            state_features_node = nengo.Node(
-                state_features_func,
-                label="StateFeatures"
-            )
+            state_features_node = nengo.Node(state_features_func, label="StateFeatures")
 
             # State ensemble (reduced neurons for speed)
             state_ensemble = nengo.Ensemble(
                 n_neurons=100,  # 300
                 dimensions=3,
                 radius=1.5,
-                label="StateEnsemble"
+                label="StateEnsemble",
             )
 
             nengo.Connection(state_features_node, state_ensemble, synapse=None)
 
             # Basal ganglia operator selection
             selected_operator_ens = self.bg_selector.build_network(
-                self.model,
-                state_ensemble
+                self.model, state_ensemble
             )
 
             # Build neuromorphic operator networks (if using neuromorphic modes)
             if self.operator_mode in ("nm_dual", "nm_softmix"):
                 for operator in self.operators:
                     # Check if operator has build_network method (neuromorphic operators do)
-                    if hasattr(operator, 'build_network'):
+                    if hasattr(operator, "build_network"):
                         operator.build_network(
-                            self.model,
-                            state_ensemble,
-                            self.dimension
+                            self.model, state_ensemble, self.dimension
                         )
 
             # Population generator node
@@ -318,7 +312,7 @@ class NEVOptimiser:
                     return np.array([0.0, 0.0, 0.0])
 
                 # Make simulator available to operators for spike decoding
-                if hasattr(self, 'simulator') and self.simulator is not None:
+                if hasattr(self, "simulator") and self.simulator is not None:
                     self.state["simulator"] = self.simulator
 
                 # Select operator
@@ -326,8 +320,7 @@ class NEVOptimiser:
                 if current_best is None:
                     current_best = self.f_default_worst
                 operator = self.bg_selector.select_operator(
-                    operator_selection,
-                    current_best
+                    operator_selection, current_best
                 )
 
                 # Keep latest features available for state-aware operators.
@@ -340,29 +333,27 @@ class NEVOptimiser:
                 if self.operator_mode == "nm_softmix" and len(self.operators) == 2:
                     explore_op, exploit_op = self.operators
                     explore_candidates = explore_op.generate_population(
-                        centre,
-                        self.state,
-                        self.population_size
+                        centre, self.state, self.population_size
                     )
                     exploit_candidates = exploit_op.generate_population(
-                        centre,
-                        self.state,
-                        self.population_size
+                        centre, self.state, self.population_size
                     )
 
                     mix_weights = self._compute_soft_mix_weights(operator_selection)
                     exploit_mean = float(mix_weights[1])
                     alpha = max(0.5, exploit_mean * self.soft_mix_concentration)
                     beta = max(0.5, (1.0 - exploit_mean) * self.soft_mix_concentration)
-                    lambdas = np.random.beta(alpha, beta, size=(self.population_size, 1))
+                    lambdas = np.random.beta(
+                        alpha, beta, size=(self.population_size, 1)
+                    )
 
-                    candidates = (1.0 - lambdas) * explore_candidates + lambdas * exploit_candidates
+                    candidates = (
+                        1.0 - lambdas
+                    ) * explore_candidates + lambdas * exploit_candidates
                     candidates = np.clip(candidates, -1.0, 1.0)
                 else:
                     candidates = operator.generate_population(
-                        centre,
-                        self.state,
-                        self.population_size
+                        centre, self.state, self.population_size
                     )
 
                 # Evaluate - vectorised for speed
@@ -377,7 +368,10 @@ class NEVOptimiser:
                 if prev_best is None:
                     prev_best = self.f_default_worst
 
-                if self.state["best_f"] is None or fitness[best_idx] < self.state["best_f"]:
+                if (
+                    self.state["best_f"] is None
+                    or fitness[best_idx] < self.state["best_f"]
+                ):
                     improved = True
                     self.state["best_v"] = candidates[best_idx]
                     self.state["best_f"] = fitness[best_idx]
@@ -406,7 +400,7 @@ class NEVOptimiser:
                 population_generator_func,
                 size_in=len(self.operators),
                 size_out=3,
-                label="PopulationGenerator"
+                label="PopulationGenerator",
             )
 
             nengo.Connection(selected_operator_ens, population_node, synapse=0.05)
@@ -437,9 +431,11 @@ class NEVOptimiser:
             print(f"Population size: {self.population_size}")
             print(f"Operators: {[op.name for op in self.operators]}")
             print(f"Operator mode: {self.operator_mode}")
-            print(f"Expected evaluations: ~{int(time / self.dt * self.population_size):,}")
+            print(
+                f"Expected evaluations: ~{int(time / self.dt * self.population_size):,}"
+            )
             if use_dl:
-                print(f"Backend: NengoDL (GPU accelerated)")
+                print("Backend: NengoDL (GPU accelerated)")
             print()
             progress_bar = True
 
@@ -456,18 +452,25 @@ class NEVOptimiser:
         if use_dl:
             try:
                 import nengo_dl
-                with nengo_dl.Simulator(self.model, dt=self.dt, progress_bar=progress_bar) as sim:
+
+                with nengo_dl.Simulator(
+                    self.model, dt=self.dt, progress_bar=progress_bar
+                ) as sim:
                     self.simulator = sim
                     self.state["simulator"] = sim
                     sim.run(time)
             except ImportError:
                 print("Warning: nengo-dl not installed, falling back to standard Nengo")
-                with nengo.Simulator(self.model, dt=self.dt, progress_bar=progress_bar) as sim:
+                with nengo.Simulator(
+                    self.model, dt=self.dt, progress_bar=progress_bar
+                ) as sim:
                     self.simulator = sim
                     self.state["simulator"] = sim
                     sim.run(time)
         else:
-            with nengo.Simulator(self.model, dt=self.dt, progress_bar=progress_bar) as sim:
+            with nengo.Simulator(
+                self.model, dt=self.dt, progress_bar=progress_bar
+            ) as sim:
                 self.simulator = sim
                 self.state["simulator"] = sim
                 sim.run(time)
@@ -483,7 +486,7 @@ class NEVOptimiser:
         print(f"\nTotal evaluations: {self.state['total_evals']:,}")
         print(f"Best fitness: {self.state['best_f']:.6e}")
 
-        print(f"\nOperator usage:")
+        print("\nOperator usage:")
         total_calls = sum(self.state["operator_counts"].values())
         td_values = self.bg_selector.get_td_values()
         td_on = self.bg_selector.td_enabled
@@ -494,21 +497,25 @@ class NEVOptimiser:
             weight = self.bg_selector.utilities[op.name].weight
             success_rate = op.success_count / max(1, op.usage_count)
             td_str = f"  td_V={td_values[i]:.4f}" if td_on else ""
-            print(f"  {op.name:25s}: {count:6d} calls ({pct:5.1f}%)  "
-                  f"[weight: {weight:.3f}, success: {success_rate:.1%}{td_str}]")
+            print(
+                f"  {op.name:25s}: {count:6d} calls ({pct:5.1f}%)  "
+                f"[weight: {weight:.3f}, success: {success_rate:.1%}{td_str}]"
+            )
 
         if td_on:
             stats = self.bg_selector.get_td_statistics()
             lam = self.bg_selector.td_learner.lambda_coeff
-            print(f"\nTD learning  λ={lam:.2f}  "
-                  f"mean_δ={stats.get('mean_td_error', 0.0):.4f}  "
-                  f"std_δ={stats.get('std_td_error', 0.0):.4f}")
+            print(
+                f"\nTD learning  λ={lam:.2f}  "
+                f"mean_δ={stats.get('mean_td_error', 0.0):.4f}  "
+                f"std_δ={stats.get('std_td_error', 0.0):.4f}"
+            )
 
-        print(f"\nBest solution (v-space):")
+        print("\nBest solution (v-space):")
         if self.state["best_v"] is not None:
             print(f"  {self.state['best_v']}")
 
-        print(f"\nBest solution (original space):")
+        print("\nBest solution (original space):")
         if self.state["best_v"] is not None:
             x_best = trs2o(self.state["best_v"], self.lb, self.ub)
             print(f"  {x_best}")

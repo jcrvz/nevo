@@ -63,11 +63,13 @@ class StateFeatures:
         n_valid = np.sum(valid_mask)
 
         if n_valid < 2:
-            return np.array([
-                features["diversity"],
-                features["improvement_rate"],
-                features["convergence"]
-            ])
+            return np.array(
+                [
+                    features["diversity"],
+                    features["improvement_rate"],
+                    features["convergence"],
+                ]
+            )
 
         valid_fitness = memory_fitness[valid_mask]
         valid_vectors = memory_vectors[valid_mask]
@@ -82,7 +84,7 @@ class StateFeatures:
 
         # 2. IMPROVEMENT RATE: Fraction of recent improvements
         if len(self.improvement_history) >= 10:
-            recent = self.improvement_history[-self.history_length:]
+            recent = self.improvement_history[-self.history_length :]
             rate = np.mean(recent)
             features["improvement_rate"] = float(rate)
 
@@ -102,11 +104,13 @@ class StateFeatures:
             convergence = 1.0 - np.clip(f_range / 100.0, 0.0, 1.0)
             features["convergence"] = float(convergence)
 
-        return np.array([
-            features["diversity"],
-            features["improvement_rate"],
-            features["convergence"]
-        ])
+        return np.array(
+            [
+                features["diversity"],
+                features["improvement_rate"],
+                features["convergence"],
+            ]
+        )
 
     def update_improvement_history(self, improved: bool):
         """
@@ -120,7 +124,7 @@ class StateFeatures:
         self.improvement_history.append(1.0 if improved else 0.0)
         # Keep only recent history
         if len(self.improvement_history) > self.history_length * 2:
-            self.improvement_history = self.improvement_history[-self.history_length:]
+            self.improvement_history = self.improvement_history[-self.history_length :]
 
     def reset(self):
         """Reset improvement history."""
@@ -163,4 +167,3 @@ def compute_fitness_weighted_centre(state: Dict[str, Any]) -> np.ndarray:
     weights /= np.sum(weights)
 
     return np.average(valid_vectors, axis=0, weights=weights)
-

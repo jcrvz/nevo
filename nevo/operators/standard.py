@@ -7,6 +7,7 @@ neuromorphic optimisation.
 """
 
 import numpy as np
+import nengo
 import math
 from typing import Dict, Any
 from nevo.operators.base import ExplorationOperator, ExploitationOperator
@@ -44,21 +45,19 @@ class LevyFlight(ExplorationOperator):
             Direction bias factor towards global best (0.05-0.2 recommended)
         """
         super().__init__("LevyFlight", short_name="LF", complexity=3)
-        self.alpha  = alpha
-        self.beta   = beta
-        self.gamma  = gamma
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
 
         # Precompute sigma_u for Mantegna's algorithm
         self.sigma_u = (
-            math.gamma(1 + beta) * np.sin(np.pi * beta / 2) /
-            (math.gamma((1 + beta) / 2) * beta * 2**((beta - 1) / 2))
+            math.gamma(1 + beta)
+            * np.sin(np.pi * beta / 2)
+            / (math.gamma((1 + beta) / 2) * beta * 2 ** ((beta - 1) / 2))
         ) ** (1 / beta)
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using Lévy flight."""
         dim = len(centre)
@@ -116,10 +115,7 @@ class DifferentialEvolution(ExplorationOperator):
         self.CR = CR
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using DE mutation."""
         dim = len(centre)
@@ -197,10 +193,7 @@ class ParticleSwarm(ExploitationOperator):
         self.velocities = {}  # Particle ID -> velocity
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using PSO dynamics."""
         dim = len(centre)
@@ -222,11 +215,7 @@ class ParticleSwarm(ExploitationOperator):
             cognitive = self.c1 * r1 * (centre - current)
             social = self.c2 * r2 * (global_best - current)
 
-            self.velocities[i] = (
-                self.w * self.velocities[i] +
-                cognitive +
-                social
-            )
+            self.velocities[i] = self.w * self.velocities[i] + cognitive + social
 
             # Clip velocity
             self.velocities[i] = np.clip(self.velocities[i], -0.5, 0.5)
@@ -278,10 +267,7 @@ class SpiralOptimisation(ExploitationOperator):
         self.max_theta = 2 * np.pi
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using anisotropic spiral."""
         dim = len(centre)
@@ -305,25 +291,24 @@ class SpiralOptimisation(ExploitationOperator):
                 r = np.clip(self.r_base * r_variation, 0.85, 0.999)
 
                 # Extract 2D slice
-                x_d = x[d:d+2] - global_best[d:d+2]
+                x_d = x[d : d + 2] - global_best[d : d + 2]
 
                 # Spiral transformation
-                r_theta = r ** theta
+                r_theta = r**theta
                 cos_t = np.cos(theta)
                 sin_t = np.sin(theta)
 
-                x_rotated = r_theta * np.array([
-                    cos_t * x_d[0] - sin_t * x_d[1],
-                    sin_t * x_d[0] + cos_t * x_d[1]
-                ])
+                x_rotated = r_theta * np.array(
+                    [cos_t * x_d[0] - sin_t * x_d[1], sin_t * x_d[0] + cos_t * x_d[1]]
+                )
 
-                x[d:d+2] = global_best[d:d+2] + x_rotated
+                x[d : d + 2] = global_best[d : d + 2] + x_rotated
 
             # Handle odd dimension
             if dim % 2 == 1:
                 theta_odd = np.random.uniform(self.min_theta, self.max_theta)
                 r_odd = np.clip(self.r_base * np.random.uniform(0.9, 1.1), 0.85, 0.999)
-                x[-1] = global_best[-1] + r_odd ** theta_odd * (x[-1] - global_best[-1])
+                x[-1] = global_best[-1] + r_odd**theta_odd * (x[-1] - global_best[-1])
 
             candidates.append(np.clip(x, -1.0, 1.0))
 
@@ -368,10 +353,7 @@ class RandomSearch(ExplorationOperator):
         self.distribution = distribution
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using random perturbations."""
         dim = len(centre)
@@ -423,10 +405,7 @@ class LocalRandomWalk(ExploitationOperator):
         self.scale = scale
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using local random walk."""
         dim = len(centre)
@@ -440,7 +419,9 @@ class LocalRandomWalk(ExploitationOperator):
         f_default_worst = state.get("f_default_worst", 1e10)
 
         valid_mask = memory_fitness < f_default_worst
-        valid_vectors = memory_vectors[valid_mask] if len(memory_vectors) > 0 else np.array([])
+        valid_vectors = (
+            memory_vectors[valid_mask] if len(memory_vectors) > 0 else np.array([])
+        )
 
         candidates = []
         for _ in range(population_size):
@@ -498,10 +479,7 @@ class GravitationalSearch(ExplorationOperator):
         self.iteration = 0
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using gravitational dynamics."""
         dim = len(centre)
@@ -591,10 +569,7 @@ class FireflyAlgorithm(ExplorationOperator):
         self.gamma = gamma
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using firefly dynamics."""
         dim = len(centre)
@@ -637,7 +612,9 @@ class FireflyAlgorithm(ExplorationOperator):
             beta_r = self.beta * np.exp(-self.gamma * r**2)
 
             # Move towards target with randomisation
-            candidate = pos + beta_r * (target - pos) + self.alpha * np.random.randn(dim)
+            candidate = (
+                pos + beta_r * (target - pos) + self.alpha * np.random.randn(dim)
+            )
             candidates.append(np.clip(candidate, -1.0, 1.0))
 
         return np.array(candidates)
@@ -676,10 +653,7 @@ class CentralForce(ExplorationOperator):
         self.alpha = alpha
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using central force dynamics."""
         dim = len(centre)
@@ -697,7 +671,7 @@ class CentralForce(ExplorationOperator):
             dist = np.linalg.norm(diff) + 1e-12
 
             # Inverse power law attraction
-            force = self.gravity * diff / (dist ** self.alpha)
+            force = self.gravity * diff / (dist**self.alpha)
 
             # Random velocity component
             velocity = np.random.rand() * force + 0.1 * np.random.randn(dim)
@@ -740,10 +714,7 @@ class GeneticCrossover(ExplorationOperator):
         self.alpha = alpha
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using genetic crossover."""
         dim = len(centre)
@@ -769,7 +740,9 @@ class GeneticCrossover(ExplorationOperator):
         candidates = []
         for _ in range(population_size):
             # Select two parents (fitness-biased)
-            parents_idx = np.random.choice(len(valid_vectors), 2, replace=False, p=probs)
+            parents_idx = np.random.choice(
+                len(valid_vectors), 2, replace=False, p=probs
+            )
             p1, p2 = valid_vectors[parents_idx]
 
             if self.crossover == "blend":
@@ -818,7 +791,12 @@ class GeneticMutation(ExploitationOperator):
     behaves more like exploration. Default parameters favour exploitation.
     """
 
-    def __init__(self, mutation_rate: float = 0.2, scale: float = 0.3, distribution: str = "gaussian"):
+    def __init__(
+        self,
+        mutation_rate: float = 0.2,
+        scale: float = 0.3,
+        distribution: str = "gaussian",
+    ):
         """
         Parameters
         ----------
@@ -835,10 +813,7 @@ class GeneticMutation(ExploitationOperator):
         self.distribution = distribution
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using genetic mutation."""
         dim = len(centre)
@@ -912,10 +887,7 @@ class SimulatedAnnealing(ExploitationOperator):
         self.temperature = initial_temp
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates using temperature-scaled perturbations."""
         dim = len(centre)
@@ -979,10 +951,7 @@ class TabuSearch(ExploitationOperator):
         self.tabu_list = []
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """Generate candidates avoiding tabu regions."""
         dim = len(centre)
@@ -1000,7 +969,10 @@ class TabuSearch(ExploitationOperator):
             is_tabu = False
             closest_tabu = None
             for tabu_point in self.tabu_list:
-                if np.linalg.norm(candidate - tabu_point) < self.neighbourhood_size * 0.5:
+                if (
+                    np.linalg.norm(candidate - tabu_point)
+                    < self.neighbourhood_size * 0.5
+                ):
                     is_tabu = True
                     closest_tabu = tabu_point
                     break
@@ -1008,7 +980,12 @@ class TabuSearch(ExploitationOperator):
             if is_tabu and closest_tabu is not None:
                 # Move away from tabu region
                 direction = candidate - closest_tabu
-                candidate = centre + direction / (np.linalg.norm(direction) + 1e-12) * self.neighbourhood_size
+                candidate = (
+                    centre
+                    + direction
+                    / (np.linalg.norm(direction) + 1e-12)
+                    * self.neighbourhood_size
+                )
 
             candidates.append(np.clip(candidate, -1.0, 1.0))
 
@@ -1039,7 +1016,9 @@ class NeuromorphicExplorationEnsemble(ExplorationOperator):
         intercepts: tuple = (-1.0, 1.0),
         use_numpy_fallback: bool = False,
     ):
-        super().__init__("NeuromorphicExplorationEnsemble", short_name="NEX", complexity=6)
+        super().__init__(
+            "NeuromorphicExplorationEnsemble", short_name="NEX", complexity=6
+        )
         self.n_neurons = n_neurons
         self.tau_synapse = tau_synapse
         self.max_rates = max_rates
@@ -1049,11 +1028,8 @@ class NeuromorphicExplorationEnsemble(ExplorationOperator):
         self._nengo_model = None
 
     def build_network(
-        self,
-        model: 'nengo.Network',
-        state_ensemble: 'nengo.Ensemble',
-        dimension: int
-    ) -> 'nengo.Ensemble':
+        self, model: "nengo.Network", state_ensemble: "nengo.Ensemble", dimension: int
+    ) -> "nengo.Ensemble":
         """
         Build Nengo LIF ensemble for exploration with spike decoding.
         """
@@ -1068,7 +1044,7 @@ class NeuromorphicExplorationEnsemble(ExplorationOperator):
                 neuron_type=nengo.LIF(),
                 max_rates=nengo.dists.Uniform(self.max_rates[0], self.max_rates[1]),
                 intercepts=nengo.dists.Uniform(self.intercepts[0], self.intercepts[1]),
-                label="ExplorationEnsemble"
+                label="ExplorationEnsemble",
             )
 
             # Fast synaptic connection from state
@@ -1076,21 +1052,20 @@ class NeuromorphicExplorationEnsemble(ExplorationOperator):
                 state_ensemble,
                 self._nengo_ensemble,
                 synapse=self.tau_synapse,
-                transform=[[0.1, 0.1, 0.1]] * dimension
+                transform=[[0.1, 0.1, 0.1]] * dimension,
             )
 
             # Probe to read decoded output from spikes
-            self._output_probe = nengo.Probe(self._nengo_ensemble, synapse=self.tau_synapse)
+            self._output_probe = nengo.Probe(
+                self._nengo_ensemble, synapse=self.tau_synapse
+            )
 
             self._nengo_model = model
 
         return self._nengo_ensemble
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """
         Generate exploration candidates from Nengo spike decoding.
@@ -1112,8 +1087,8 @@ class NeuromorphicExplorationEnsemble(ExplorationOperator):
 
         # Use spike decoding (default behavior)
         if not self.use_numpy_fallback:
-            sim = state.get('simulator')
-            if sim is None or not hasattr(self, '_output_probe'):
+            sim = state.get("simulator")
+            if sim is None or not hasattr(self, "_output_probe"):
                 raise RuntimeError(
                     "Neuromorphic operator requires Nengo simulator with probe. "
                     "Set use_numpy_fallback=True for numpy-based generation."
@@ -1132,7 +1107,11 @@ class NeuromorphicExplorationEnsemble(ExplorationOperator):
                 if np.linalg.norm(decoded_activity) < 1e-6:
                     neural_noise = np.random.randn(dim) * exploration_scale * 0.1
                 else:
-                    neural_noise = decoded_activity * exploration_scale * (0.5 + 0.5 * np.random.rand())
+                    neural_noise = (
+                        decoded_activity
+                        * exploration_scale
+                        * (0.5 + 0.5 * np.random.rand())
+                    )
                 candidate = centre + repulsion_mag * repulsion + neural_noise
                 candidates.append(np.clip(candidate, -1.0, 1.0))
 
@@ -1167,7 +1146,9 @@ class NeuromorphicExploitationEnsemble(ExploitationOperator):
         trust_radius: float = 0.2,
         use_numpy_fallback: bool = False,
     ):
-        super().__init__("NeuromorphicExploitationEnsemble", short_name="NXP", complexity=6)
+        super().__init__(
+            "NeuromorphicExploitationEnsemble", short_name="NXP", complexity=6
+        )
         self.n_neurons = n_neurons
         self.tau_synapse = tau_synapse
         self.max_rates = max_rates
@@ -1179,16 +1160,11 @@ class NeuromorphicExploitationEnsemble(ExploitationOperator):
         self._attractor = None
 
     def build_network(
-        self,
-        model: 'nengo.Network',
-        state_ensemble: 'nengo.Ensemble',
-        dimension: int
-    ) -> 'nengo.Ensemble':
+        self, model: "nengo.Network", state_ensemble: "nengo.Ensemble", dimension: int
+    ) -> "nengo.Ensemble":
         """
         Build Nengo LIF ensemble for exploitation with spike decoding.
         """
-        import nengo
-
         with model:
             # LIF spiking ensemble
             self._nengo_ensemble = nengo.Ensemble(
@@ -1198,7 +1174,7 @@ class NeuromorphicExploitationEnsemble(ExploitationOperator):
                 neuron_type=nengo.LIF(),
                 max_rates=nengo.dists.Uniform(self.max_rates[0], self.max_rates[1]),
                 intercepts=nengo.dists.Uniform(self.intercepts[0], self.intercepts[1]),
-                label="ExploitationEnsemble"
+                label="ExploitationEnsemble",
             )
 
             # Slow synaptic connection from state
@@ -1206,21 +1182,20 @@ class NeuromorphicExploitationEnsemble(ExploitationOperator):
                 state_ensemble,
                 self._nengo_ensemble,
                 synapse=self.tau_synapse,
-                transform=[[0.05, 0.05, 0.05]] * dimension
+                transform=[[0.05, 0.05, 0.05]] * dimension,
             )
 
             # Probe to read decoded output from spikes
-            self._output_probe = nengo.Probe(self._nengo_ensemble, synapse=self.tau_synapse)
+            self._output_probe = nengo.Probe(
+                self._nengo_ensemble, synapse=self.tau_synapse
+            )
 
             self._nengo_model = model
 
         return self._nengo_ensemble
 
     def generate_population(
-        self,
-        centre: np.ndarray,
-        state: Dict[str, Any],
-        population_size: int
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
     ) -> np.ndarray:
         """
         Generate exploitation candidates from Nengo spike decoding.
@@ -1247,8 +1222,8 @@ class NeuromorphicExploitationEnsemble(ExploitationOperator):
 
         # Use spike decoding (default behavior)
         if not self.use_numpy_fallback:
-            sim = state.get('simulator')
-            if sim is None or not hasattr(self, '_output_probe'):
+            sim = state.get("simulator")
+            if sim is None or not hasattr(self, "_output_probe"):
                 raise RuntimeError(
                     "Neuromorphic operator requires Nengo simulator with probe. "
                     "Set use_numpy_fallback=True for numpy-based generation."
@@ -1267,7 +1242,9 @@ class NeuromorphicExploitationEnsemble(ExploitationOperator):
                 if np.linalg.norm(decoded_activity) < 1e-6:
                     neural_noise = np.random.randn(dim) * local_noise * 0.1
                 else:
-                    neural_noise = decoded_activity * local_noise * (0.5 + 0.5 * np.random.rand())
+                    neural_noise = (
+                        decoded_activity * local_noise * (0.5 + 0.5 * np.random.rand())
+                    )
                 neural_noise = np.clip(neural_noise, -adaptive_radius, adaptive_radius)
                 candidate = self._attractor + neural_noise
                 candidates.append(np.clip(candidate, -1.0, 1.0))
@@ -1282,4 +1259,3 @@ class NeuromorphicExploitationEnsemble(ExploitationOperator):
             candidates.append(np.clip(candidate, -1.0, 1.0))
 
         return np.array(candidates)
-
