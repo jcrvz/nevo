@@ -20,17 +20,17 @@ class LevyFlight(ExplorationOperator):
     Heavy-tailed random walk for escaping local minima.
     Uses Mantegna's algorithm to generate Lévy-distributed steps.
 
-    Best used when: stuck in local optima, need global exploration
+    Best used when: stuck in local optima, need global exploration.
 
-    The mathematical expression for this operator is given by:
-    x_{new} = x_{centre} + \alpha \cdot L_{\beta} + \gamma \cdot (x_{best} - x_{centre})
+    The update rule is:
 
-    where:
-    - \( x_{new} \) is the new candidate solution.
-    - \( x_{centre} \) is the current centre solution.
-    - \( \alpha \) is the step size scaling factor.
-    - \( L_{\beta} \) is a Lévy-distributed random step generated using Mantegna's algorithm with exponent \( \beta \).
-    - \( \gamma \) is the direction bias factor towards the global best solution \( x_{best} \).
+    .. math::
+
+        x_{\\text{new}} = x_c + \\alpha L_{\\beta} + \\gamma (x_{\\text{best}} - x_c)
+
+    where :math:`\\alpha` is the step size, :math:`L_{\\beta}` is a Lévy-distributed
+    step (Mantegna's algorithm, exponent :math:`\\beta`), and :math:`\\gamma` controls
+    the direction bias towards :math:`x_{\\text{best}}`.
     """
 
     def __init__(self, alpha: float = 0.3, beta: float = 1.5, gamma: float = 0.1):
@@ -89,16 +89,16 @@ class DifferentialEvolution(ExplorationOperator):
     Uses memory diversity to generate directed exploration.
     Creates new solutions by combining existing memory solutions.
 
-    Best used when: memory has diversity, exploring promising regions
+    Best used when: memory has diversity, exploring promising regions.
 
-    The mathematical expression for this operator is given by:
-    x_{new} = x_{a} + F \cdot (x_{b} - x_{c})
+    The update rule (DE/rand/1/bin) is:
 
-    where:
-    - \( x_{new} \) is the new candidate solution.
-    - \( x_{a}, x_{b}, x_{c} \) are distinct solutions randomly selected from memory.
-    - \( F \) is the mutation factor controlling the differential weight.
-    - Crossover is performed with the centre solution using a crossover probability \( CR \).
+    .. math::
+
+        x_{\\text{new}} = x_a + F (x_b - x_c)
+
+    where :math:`x_a, x_b, x_c` are distinct memory solutions, :math:`F` is the
+    mutation factor, and binomial crossover is applied with probability :math:`CR`.
     """
 
     def __init__(self, F: float = 0.8, CR: float = 0.9):
@@ -159,20 +159,18 @@ class ParticleSwarm(ExploitationOperator):
     Velocity-based exploitation with attraction to personal and global bests.
     Maintains velocity state for smooth convergence.
 
-    Best used when: improving and converging, exploitation phase
+    Best used when: improving and converging, exploitation phase.
 
-    The mathematical expression for this operator is given by:
-    v_{i} = w \cdot v_{i} + c_1 \cdot r_1 \cdot (pbest_{i} - x_{i}) + c_2 \cdot r_2 \cdot (gbest - x_{i})
-    x_{new} = x_{i} + v_{i}
+    The update equations are:
 
-    where:
-    - \( v_{i} \) is the velocity of particle \( i \).
-    - \( x_{i} \) is the current position of particle \( i \).
-    - \( pbest_{i} \) is the personal best position of particle \( i \) (approximated here as centre).
-    - \( gbest \) is the global best position found so far.
-    - \( w \) is the inertia weight.
-    - \( c_1, c_2 \) are the cognitive and social coefficients.
+    .. math::
 
+        v_i &= w v_i + c_1 r_1 (p_{\\text{best}} - x_i)
+              + c_2 r_2 (g_{\\text{best}} - x_i) \\\\
+        x_{\\text{new}} &= x_i + v_i
+
+    where :math:`w` is the inertia weight and :math:`c_1, c_2` are the cognitive
+    and social coefficients.
     """
 
     def __init__(self, w: float = 0.7, c1: float = 1.5, c2: float = 1.5):
@@ -236,22 +234,16 @@ class SpiralOptimisation(ExploitationOperator):
 
     Best used when: highly converged, fine-tuning phase
 
-    The mathematical expression for this operator is given by:
-    x_{new} = x_{best} + r^{\theta} \cdot
-               \begin{bmatrix}
-               \cos(\theta) & -\sin(\theta) \\
-               \sin(\theta) & \cos(\theta)
-               \end{bmatrix}
-               \cdot (x_{i} - x_{best})
+    The update rule is:
 
-    where:
-    - \( x_{new} \) is the new candidate solution.
-    - \( x_{i} \) is the current position of the solution.
-    - \( x_{best} \) is the global best position found so far.
-    - \( r \) is the convergence rate (0 < r < 1).
-    - \( \theta \) is the rotation angle in radians.
+    .. math::
 
+        x_{new} = x_{best} + r^{\\theta}
+        \\begin{bmatrix} \\cos\\theta & -\\sin\\theta \\\\
+        \\sin\\theta & \\cos\\theta \\end{bmatrix}
+        (x_i - x_{best})
 
+    where :math:`r` is the convergence rate and :math:`\\theta` is the rotation angle.
     """
 
     def __init__(self, r_base: float = 0.995):
@@ -327,16 +319,16 @@ class RandomSearch(ExplorationOperator):
     Simple uniform random sampling around the centre.
     Useful for initial exploration or when other operators stagnate.
 
-    Best used when: no prior information, need baseline exploration
+    Best used when: no prior information, need baseline exploration.
 
-    The mathematical expression for this operator is given by:
-    x_{new} = x_{centre} + \delta
+    The update rule is:
 
-    where:
-    - \( x_{new} \) is the new candidate solution.
-    - \( x_{centre} \) is the current centre solution.
-    - \( \delta \) is a random perturbation vector sampled from a uniform or Gaussian distribution.
+    .. math::
 
+        x_{\\text{new}} = x_c + \\delta
+
+    where :math:`\\delta` is sampled from a uniform or Gaussian distribution
+    with scale parameter :math:`s`.
     """
 
     def __init__(self, scale: float = 0.5, distribution: str = "uniform"):
@@ -378,17 +370,16 @@ class LocalRandomWalk(ExploitationOperator):
     Small-scale local exploration with probability-based activation.
     Generates subtle perturbations for fine-tuning solutions.
 
-    Best used when: near optimum, need local refinement
+    Best used when: near optimum, need local refinement.
 
-    The mathematical expression for this operator is given by:
-    x_{new} = x_{centre} + s \cdot \Delta
+    The update rule is:
 
-    where:
-    - \( x_{new} \) is the new candidate solution.
-    - \( x_{centre} \) is the current centre solution.
-    - \( s \) is the step size scale.
-    - \( \Delta \) is a difference vector derived from two randomly selected memory solutions.
+    .. math::
 
+        x_{\\text{new}} = x_c + s \\, \\Delta
+
+    where :math:`s` is the step size scale and :math:`\\Delta` is a difference
+    vector from two randomly selected memory solutions.
     """
 
     def __init__(self, probability: float = 0.75, scale: float = 0.1):
@@ -452,15 +443,16 @@ class GravitationalSearch(ExplorationOperator):
     Mass-based attraction dynamics where better solutions have more mass.
     Solutions are attracted towards heavier (better) solutions.
 
-    Best used when: need directed exploration, moderate diversity
+    Best used when: need directed exploration, moderate diversity.
 
-    The mathematical expression for this operator is given by:
-    x_{new} = x_{i} + a_{i}
+    The update rule is:
 
-    where:
-    - \( x_{new} \) is the new candidate solution.
-    - \( x_{i} \) is the current position of the solution.
-    - \( a_{i} \) is the acceleration vector computed based on gravitational forces from other solutions, weighted by their masses (fitness).
+    .. math::
+
+        x_{\\text{new}} = x_i + a_i
+
+    where :math:`a_i` is the acceleration from gravitational forces of all other
+    solutions, weighted by their masses (derived from fitness).
 
     """
 
@@ -537,19 +529,17 @@ class FireflyAlgorithm(ExplorationOperator):
     Light-based attraction where brighter (better) fireflies attract others.
     Combines attraction with randomisation for balanced exploration.
 
-    Best used when: need attraction-based exploration, moderate convergence
+    Best used when: need attraction-based exploration, moderate convergence.
 
-    The mathematical expression for this operator is given by:
-    x_{new} = x_{i} + \beta(r) \cdot (x_{j} - x_{i}) + \alpha \cdot \epsilon
+    The update rule is:
 
-    where:
-    - \( x_{new} \) is the new candidate solution.
-    - \( x_{i} \) is the current position of the firefly.
-    - \( x_{j} \) is the position of a brighter firefly.
-    - \( \beta(r) \) is the attractiveness function based on distance \( r \).
-    - \( \alpha \) is the randomisation parameter.
-    - \( \epsilon \) is a random perturbation vector.
+    .. math::
 
+        x_{\\text{new}} = x_i + \\beta(r)(x_j - x_i) + \\alpha \\epsilon
+
+    where :math:`\\beta(r) = \\beta_0 e^{-\\gamma r^2}` is the distance-based
+    attractiveness, :math:`\\alpha` is the randomisation parameter, and
+    :math:`\\epsilon` is a random perturbation.
     """
 
     def __init__(self, alpha: float = 0.2, beta: float = 1.0, gamma: float = 1.0):

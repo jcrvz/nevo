@@ -1,0 +1,20 @@
+/* NEVO documentation — minor style additions on top of furo */
+
+/* Wider content area on large screens */
+@media (min-width: 1200px) {
+    .content {
+        max-width: 900px;
+    }
+}
+
+/* Monospace for parameter names in tables */
+.field-list dt code {
+    font-size: 0.95em;
+}
+
+/* Subtle separator below page titles */
+h1 {
+    border-bottom: 2px solid var(--color-brand-primary);
+    padding-bottom: 0.3em;
+}
+
