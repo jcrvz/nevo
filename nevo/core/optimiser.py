@@ -406,10 +406,10 @@ class NEVOptimiser:
             nengo.Connection(selected_operator_ens, population_node, synapse=0.05)
 
             # Probes
-            self.state_features_probe = nengo.Probe(state_features_node, synapse=None)
-            self.state_probe = nengo.Probe(state_ensemble, synapse=0.01)
-            self.operator_probe = nengo.Probe(selected_operator_ens, synapse=0.01)
-            self.stats_probe = nengo.Probe(population_node, synapse=None)
+            self.state_features_probe   = nengo.Probe(state_features_node, synapse=None)
+            self.state_probe            = nengo.Probe(state_ensemble, synapse=0.01)
+            self.operator_probe         = nengo.Probe(selected_operator_ens, synapse=0.01)
+            self.stats_probe            = nengo.Probe(population_node, synapse=None)
 
     def run(self, time: float, verbose: bool = True, use_dl: bool = False):
         """
@@ -522,7 +522,7 @@ class NEVOptimiser:
 
     def get_best_solution(self) -> tuple:
         """
-        Get best solution found.
+        Get the best solution found.
 
         Returns
         -------

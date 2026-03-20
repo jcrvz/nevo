@@ -350,7 +350,7 @@ class EligibilityTraceManager:
     """
     Manages eligibility traces for TD(λ) learning.
 
-    Maintains traces that decay over time, enabling multi-step credit assignment.
+    Maintains traces that decay over time, enabling multistep credit assignment.
     """
 
     def __init__(

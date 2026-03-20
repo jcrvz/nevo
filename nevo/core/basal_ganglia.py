@@ -123,10 +123,9 @@ def utility_spiral(x: np.ndarray) -> float:
     return convergence * 0.8 + improvement * 0.4 + 0.1
 
 
-# ============================================================================
-# Utility functions for additional operators (inspired by customhys)
-# ============================================================================
-
+# ---
+# Utility functions for additional operators (inspired by CUSTOMHyS)
+# ---
 
 def utility_random_search(x: np.ndarray) -> float:
     """
@@ -146,7 +145,7 @@ def utility_local_random_walk(x: np.ndarray) -> float:
     Input: [diversity, improvement_rate, convergence]
     """
     diversity, improvement, convergence = x
-    # Use for local refinement when near optimum
+    # Use for local refinement when near optimal
     return convergence * 0.6 + improvement * 0.3 + 0.1
 
 
@@ -238,28 +237,6 @@ def utility_tabu_search(x: np.ndarray) -> float:
     return (1.0 - improvement) * 0.5 + convergence * 0.3 + 0.1
 
 
-def utility_bat_algorithm(x: np.ndarray) -> float:
-    """
-    BatAlgorithm utility: high when need adaptive exploration.
-
-    Input: [diversity, improvement_rate, convergence]
-    """
-    diversity, improvement, convergence = x
-    # Use for frequency-based adaptive exploration
-    return diversity * 0.4 + (1.0 - convergence) * 0.3 + improvement * 0.2 + 0.1
-
-
-def utility_whale_optimisation(x: np.ndarray) -> float:
-    """
-    WhaleOptimisation utility: high when need spiral convergence.
-
-    Input: [diversity, improvement_rate, convergence]
-    """
-    diversity, improvement, convergence = x
-    # Use for balanced exploration-exploitation with spirals
-    return convergence * 0.4 + diversity * 0.3 + improvement * 0.2 + 0.1
-
-
 def utility_neuromorphic_exploration(x: np.ndarray) -> float:
     """
     Neuromorphic exploration utility: prefer when progress is low or diversity drops.
@@ -280,24 +257,22 @@ def utility_neuromorphic_exploitation(x: np.ndarray) -> float:
 
 # Default utility function mapping
 DEFAULT_UTILITY_FUNCTIONS = {
-    # Core operators
-    "LevyFlight": utility_levy_flight,
-    "DifferentialEvolution": utility_differential_evolution,
-    "ParticleSwarm": utility_particle_swarm,
-    "SpiralOptimisation": utility_spiral,
-    # Exploration operators
-    "RandomSearch": utility_random_search,
-    "GravitationalSearch": utility_gravitational_search,
-    "FireflyAlgorithm": utility_firefly,
-    "CentralForce": utility_central_force,
-    "GeneticCrossover": utility_genetic_crossover,
-    # Exploitation operators
-    "GeneticMutation": utility_genetic_mutation,
-    "LocalRandomWalk": utility_local_random_walk,
-    "SimulatedAnnealing": utility_simulated_annealing,
-    "TabuSearch": utility_tabu_search,
+    # Traditional candidate generators
+    "LevyFlight":               utility_levy_flight,
+    "DifferentialEvolution":    utility_differential_evolution,
+    "ParticleSwarm":            utility_particle_swarm,
+    "SpiralOptimisation":       utility_spiral,
+    "RandomSearch":             utility_random_search,
+    "GravitationalSearch":      utility_gravitational_search,
+    "FireflyAlgorithm":         utility_firefly,
+    "CentralForce":             utility_central_force,
+    "GeneticCrossover":         utility_genetic_crossover,
+    "GeneticMutation":          utility_genetic_mutation,
+    "LocalRandomWalk":          utility_local_random_walk,
+    "SimulatedAnnealing":       utility_simulated_annealing,
+    "TabuSearch":               utility_tabu_search,
     # Neuromorphic candidate generators
-    "NeuromorphicExplorationEnsemble": utility_neuromorphic_exploration,
+    "NeuromorphicExplorationEnsemble":  utility_neuromorphic_exploration,
     "NeuromorphicExploitationEnsemble": utility_neuromorphic_exploitation,
 }
 
@@ -306,9 +281,8 @@ class BasalGangliaSelector:
     """
     Basal ganglia-based operator selection network with modular TD learning.
 
-    Implements winner-take-all selection of operators based on
-    state-dependent utility functions and learned value estimates via
-    Temporal Difference learning (TD(0) or TD(λ)).
+    Implements Winner-Take-All (WTA) selection of operators based on state-dependent utility functions and learned value
+    estimates via Temporal Difference learning (TD(0) or TD(λ)).
     """
 
     def __init__(
@@ -338,7 +312,7 @@ class BasalGangliaSelector:
         learning_rate : float
             TD learning rate α
         gamma : float
-            Discount factor for future rewards
+            Discount factor for upcoming rewards
         lambda_coeff : float
             λ parameter (0.0=TD(0), 1.0=Monte Carlo)
         learning_rule : LearningRule, optional
@@ -354,7 +328,7 @@ class BasalGangliaSelector:
         self.epsilon = epsilon
         self.td_enabled = td_enabled
 
-        # Initialize utility functions
+        # Initialise utility functions
         if utility_functions is None:
             utility_functions = DEFAULT_UTILITY_FUNCTIONS
 
@@ -368,7 +342,7 @@ class BasalGangliaSelector:
                 # Default neutral utility
                 self.utilities[op.name] = UtilityFunction(op.name, lambda x: 0.5)
 
-        # Initialize TD learner if enabled
+        # Initialise TD learner if enabled
         if td_enabled:
             self.td_learner = TemporalDifferenceLearner(
                 n_operators=self.n_operators,
@@ -468,14 +442,13 @@ class BasalGangliaSelector:
         """
         Select operator using Nengo basal ganglia output + epsilon-greedy policy.
 
-        When td_enabled=True, TD(0)/TD(λ) value estimates bias the utility
-        weights that feed the Nengo BG network, so learned knowledge flows
-        back through the neuromorphic circuit rather than bypassing it.
+        When td_enabled=True, TD(0)/TD(λ) value estimates bias the utility weights that feed the Nengo BG network, so
+        learned knowledge flows back through the neuromorphic circuit rather than bypassing it.
 
         Decision flow
         -------------
         1. Compute reward from fitness improvement (after last operator executed).
-        2. Update TD values for the *last* operator using reward + bootstrap.
+        2. Update TD values for the last operator using reward + bootstrap.
         3. Add TD value bias to utility weights (scales Nengo BG input).
         4. Read Nengo thalamus output (operator_selection) as action scores.
         5. Epsilon-greedy: random with prob ε, else argmax of BG output.
@@ -483,7 +456,7 @@ class BasalGangliaSelector:
         Parameters
         ----------
         operator_selection : np.ndarray
-            Thalamus output from the Nengo BG network (n_operators,)
+            Thalamus output from Nengo BG network (n_operators,)
         current_best_fitness : float
             Current best fitness value
 
@@ -492,7 +465,7 @@ class BasalGangliaSelector:
         operator : Operator
             Selected operator
         """
-        # ------------------------------------------------------------------
+        #
         # Step 1 – compute reward for the operator that just ran
         # ------------------------------------------------------------------
         reward = 0.0
@@ -504,7 +477,6 @@ class BasalGangliaSelector:
             else:
                 reward = -0.01
 
-            # ------------------------------------------------------------------
             # Step 2 – TD update for the last operator
             #   Bootstrap target: r + γ * max_j V(j)  [snapshot BEFORE update]
             # ------------------------------------------------------------------
@@ -518,12 +490,9 @@ class BasalGangliaSelector:
                     is_terminal=False,
                 )
 
-            # ------------------------------------------------------------------
             # Also update utility weight (used by Nengo BG utility functions)
-            # ------------------------------------------------------------------
             self.utilities[self.last_operator.name].update_weight(reward, lr=0.1)
 
-        # ------------------------------------------------------------------
         # Step 3 – let Nengo BG output drive action scores
         #   If TD is on, TD values act as an *additive bias* to the BG signal
         #   (normalised so neither dominates completely).
@@ -532,12 +501,13 @@ class BasalGangliaSelector:
 
         if self.td_enabled and self.td_learner is not None:
             td_values = self.td_learner.get_values()  # updated values
+
             # Normalise both signals to [0, 1] before mixing so scales match
-            bg_norm = bg_signal - bg_signal.min()
+            bg_norm  = bg_signal - bg_signal.min()
             bg_range = bg_norm.max() + 1e-8
             bg_norm /= bg_range
 
-            td_norm = td_values - td_values.min()
+            td_norm  = td_values - td_values.min()
             td_range = td_norm.max() + 1e-8
             td_norm /= td_range
 
@@ -546,7 +516,6 @@ class BasalGangliaSelector:
         else:
             combined = bg_signal
 
-        # ------------------------------------------------------------------
         # Step 4 – epsilon-greedy selection over combined scores
         # ------------------------------------------------------------------
         if np.random.rand() < self.epsilon:
@@ -559,7 +528,6 @@ class BasalGangliaSelector:
 
         selected_operator = self.operators[operator_idx]
 
-        # ------------------------------------------------------------------
         # Step 5 – store state for next call
         # ------------------------------------------------------------------
         self.last_operator_idx = operator_idx
@@ -572,20 +540,20 @@ class BasalGangliaSelector:
         """
         Reset for new episode.
 
-        Call this at the start of optimization to initialize TD learning.
+        Call this at the start of optimisation to initialise TD learning.
         """
-        self.last_operator_idx = None
-        self.last_operator = None
-        self.last_best_fitness = None
-        self.episode_count += 1
+        self.last_operator_idx  = None
+        self.last_operator      = None
+        self.last_best_fitness  = None
+        self.episode_count     += 1
         if self.td_enabled and self.td_learner is not None:
             self.td_learner.begin_episode()
 
     def end_episode(self):
         """
-        Finalize episode learning.
+        Finalise episode learning.
 
-        Call this at the end of optimization run.
+        Call this at the end of optimisation run.
         """
         pass
 

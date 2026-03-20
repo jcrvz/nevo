@@ -64,9 +64,9 @@ def example_td0_learning():
         seed=42,
     )
 
-    print(f"  Discount factor gamma = 0.99")
-    print(f"  Learning rate alpha = 0.1")
-    print(f"  lambda = 0.0 (TD(0), no eligibility traces)")
+    print("  Discount factor gamma = 0.99")
+    print("  Learning rate alpha = 0.1")
+    print("  lambda = 0.0 (TD(0), no eligibility traces)")
 
     for iteration in range(3):
         optimiser.run(time=_SEG, verbose=False)
@@ -106,7 +106,7 @@ def example_td_lambda_learning():
         seed=42,
     )
 
-    print(f"  lambda = 0.9 (multi-step credit with eligibility traces)")
+    print("  lambda = 0.9 (multi-step credit with eligibility traces)")
 
     for iteration in range(3):
         optimiser.run(time=_SEG, verbose=False)
