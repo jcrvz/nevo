@@ -4,12 +4,14 @@
 
 ## Key Features
 
-- 🧠 **Neuromorphic operator selection** using basal ganglia circuits
-- ⚡ **Population-based parallel evaluation** for massive speedup
-- 🔄 **Adaptive learning** of operator utility weights
-- 🎯 **State-aware optimisation** with real-time feature extraction
+- 🧠 **Neuromorphic operator selection** using basal ganglia circuits (Nengo)
+- ⚡ **13 built-in operators** covering exploration and exploitation strategies
+- 🔄 **Adaptive utility-weight learning** with epsilon-greedy selection
+- 🎯 **State-aware optimisation** with real-time 3-D feature extraction (diversity, improvement rate, convergence)
 - 🔌 **Loihi-compatible** neural architectures
-- 📊 **Built-in visualisation** tools
+- 🚀 **Optional GPU acceleration** via `nengo-dl` / TensorFlow
+- 📊 **Built-in visualisation** tools with LaTeX-ready output
+- 🏆 **IOH / COCO benchmark** integration for reproducible experiments
 
 ## Installation
 
@@ -27,21 +29,13 @@ cd nevo
 pip install -e .
 ```
 
-### Using uv (recommended for modern Python projects)
-
-If you have [uv](https://github.com/astral-sh/uv) installed, you can install dependencies from `pyproject.toml`:
+### Using uv (recommended)
 
 ```bash
 uv pip install -e .
-```
-
-Or to install all dependencies (including dev):
-
-```bash
+# include dev dependencies
 uv pip install -e . --extra dev
 ```
-
-NEVO uses a `pyproject.toml` for dependency management and build configuration. This enables modern, reproducible Python environments.
 
 ## Quick Start
 
@@ -52,7 +46,7 @@ from ioh import get_problem
 # Define optimisation problem
 problem = get_problem(fid=1, dimension=10, instance=1)
 
-# Create optimizer
+# Create optimiser
 optimiser = NEVOptimiser(
     objective_function=problem,
     bounds=(problem.bounds.lb, problem.bounds.ub),
@@ -67,28 +61,45 @@ optimiser.run(time=20.0)
 # Get results
 x_best, f_best = optimiser.get_best_solution()
 print(f"Best fitness: {f_best:.6e}")
+
+# Access time-series probe data
+data = optimiser.simulator.data[optimiser.stats_probe]  # shape (T, 3)
 ```
 
 ## Architecture
 
-NEVO uses a **basal ganglia** neural circuit to select between multiple optimisation operators:
+NEVO uses a **basal ganglia** neural circuit to select between multiple optimisation operators based on the current search state.
 
-- **LevyFlight**: Heavy-tailed exploration for escaping local minima
-- **DifferentialEvolution**: Memory-based directed exploration
-- **ParticleSwarm**: Velocity-based exploitation
-- **SpiralOptimisation**: Anisotropic fine-tuning
+### Operators (13 total)
 
-Selection is based on **state features**:
-- **Diversity**: Spread of solutions in search space
-- **Improvement rate**: Recent success frequency
-- **Convergence**: Fitness homogeneity
+| Type | Operator | Description                                        |
+|---|---|----------------------------------------------------|
+| Exploration | `LevyFlight` | Heavy-tailed random walk for escaping local minima |
+| Exploration | `DifferentialEvolution` | Memory-based directed recombination                |
+| Exploration | `ParticleSwarm` | Velocity-based swarm search                        |
+| Exploration | `SpiralOptimisation` | Anisotropic spiral trajectories                    |
+| Exploration | `RandomSearch` | Baseline uniform random sampling                   |
+| Exploration | `GravitationalSearch` | Mass-attraction directed exploration               |
+| Exploration | `FireflyAlgorithm` | Brightness-attraction swarm search                 |
+| Exploration | `CentralForce` | Newtonian gravitational force-based movement       |
+| Exploration | `GeneticCrossover` | Recombination of memory solutions                  |
+| Exploitation | `GeneticMutation` | Perturbation for diversity injection               |
+| Exploitation | `LocalRandomWalk` | Gaussian local refinement                          |
+| Exploitation | `SimulatedAnnealing` | Controlled stochastic local search                 |
+| Exploitation | `TabuSearch` | Memory-guided local search with avoidance          |
+
+### State Features
+
+Selection is based on a **3-D state vector** computed each timestep, which captures the current search dynamics as described below.
+- **Diversity**: spread of solutions in v-space `[-1, 1]^D`
+- **Improvement rate**: fraction of recent timesteps with fitness gain
+- **Convergence**: fitness homogeneity in the memory archive
 
 ## Examples
 
-See the `nevo/examples/` directory for complete examples:
-
 ```bash
 python nevo/examples/basic_example.py
+python nevo/examples/benchmark_experiment.py --suite cocoex --problems 1-24 --dimensions 2,3,5,10
 ```
 
 ## Neuromorphic Benefits
@@ -103,25 +114,48 @@ python nevo/examples/basic_example.py
 If you use NEVO in your research, please cite:
 
 ```bibtex
-@software{nevo2025,
-  title={NEVO: Neuromorphic Evolutionary Optimisation},
+@software{nevo2026repo,
+  title={NEVO: Neuromorphic EVolutionary Optimisation},
   author={Cruz-Duarte, Jorge Mario and Talbi, El-Ghazali},
-  year={2025},
+  year={2026},
   url={https://github.com/jcrvz/nevo}
+}
+```
+
+Also consider the related paper and dataset from Zenodo:
+
+```bibtex
+@inproceedings{nevo2026cecpaper,
+    author    = {Cruz-Duarte, Jorge M. and Talbi, El-ghazali},
+    title     = {{NEVO: A Neuromorphic EVolutionary Optimiser with Spike-Driven Cortico-Basal-Thalamic Coordination}},
+    booktitle = {Proceedings of the 2026 IEEE Congress on Evolutionary Computation (CEC)},
+    year = {2026},
+    pages = {1--6},
+    venue = {Maastricht, Netherlands},
+    publisher = {IEEE},
+    note = {Accepted for publication},
+}
+```
+
+```bibtex
+@dataset{nevo2026cecdataset,
+  author    = {Cruz-Duarte, Jorge M. and Talbi, El-ghazali},
+  title     = {NEVO: A Neuromorphic EVolutionary Optimiser with Spike-Driven Cortico-Basal-Thalamic Coordination - Codes and Results},
+  month     = jan,
+  year      = 2026,
+  publisher = {Zenodo},
+  version   = {1.0.0},
+  doi       = {10.5281/zenodo.18444113},
+  url       = {https://doi.org/10.5281/zenodo.18444113},
 }
 ```
 
 ## License
 
-MIT Licence - see [LICENCE](LICENSE) file for details.
+BSD 3-Clause License — see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Related Projects
-
-- [neuroptimiser](https://github.com/jcrvz/neuroptimiser) - Original research implementation
-- [Nengo](https://www.nengo.ai/) - Neural Engineering Framework
-- [IOHexperimenter](https://iohprofiler.github.io/) - Benchmarking suite
 

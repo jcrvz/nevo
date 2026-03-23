@@ -11,7 +11,7 @@ Key Features:
 - Loihi-compatible neural architectures
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __author__ = "Jorge Mario Cruz-Duarte"
 
 from nevo.core.optimiser import NEVOptimiser

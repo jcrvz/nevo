@@ -79,7 +79,7 @@ nevo/
 ├── requirements.txt        # Dependencies
 ├── README.md              # Main documentation
 ├── CONTRIBUTING.md        # Contribution guidelines
-└── LICENSE                # MIT License
+└── LICENSE                # BSD 3-Clause License
 ```
 
 ## Quick Start
@@ -237,5 +237,5 @@ plt.rcParams['text.usetex'] = False  # Disable LaTeX
 
 ## License
 
-NEVO is released under the MIT License. See `LICENSE` for details.
+NEVO is released under the BSD 3-Clause License. See `LICENSE` for details.
 
