@@ -19,11 +19,10 @@ from nevo.core.td_learning import (
 
 _SEG = 0.1   # seconds per simulation segment
 
-
+# Simple optimisation functions
 def sphere_function(x):
     """Sphere function."""
     return float(np.sum(x**2))
-
 
 def rosenbrock_function(x):
     """Rosenbrock function."""

@@ -21,7 +21,7 @@ import numpy as np
 
 from nevo import NEVOptimiser
 
-
+# Simple optimisation functions
 def sphere(x: np.ndarray) -> float:
     return float(np.sum(x**2))
 
