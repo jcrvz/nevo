@@ -1,4 +1,4 @@
-# NEVO — Neuromorphic Evolutionary Optimisation
+# NEVO: Neuromorphic Evolutionary Optimisation
 
 **NEVO** (Neuromorphic EVolutionary Optimisation) is a Python framework that bridges evolutionary computation and neuromorphic computing. It uses spiking neural networks to adaptively select and coordinate optimisation operators in real time.
 
@@ -15,13 +15,7 @@
 
 ## Installation
 
-### Using pip
-
-```bash
-pip install nevo
-```
-
-Or install from source:
+### From source (recommended)
 
 ```bash
 git clone https://github.com/jcrvz/nevo.git
@@ -29,7 +23,7 @@ cd nevo
 pip install -e .
 ```
 
-### Using uv (recommended)
+### Using uv
 
 ```bash
 uv pip install -e .
@@ -37,6 +31,7 @@ uv pip install -e . --extra dev   # includes dev dependencies
 ```
 
 NEVO uses `pyproject.toml` for dependency management and build configuration.
+Requires Python ≥ 3.10 and numpy < 2.0.
 
 ## Quick Start
 
@@ -73,27 +68,27 @@ NEVO uses a **basal ganglia** neural circuit to select between optimisation oper
 
 | `operator_mode` | Description |
 |---|---|
-| `"trad"` | 13 standard heuristic operators (default) |
+| `"trad"` / `"traditional"` | 13 standard heuristic operators (default) |
 | `"nm_dual"` | 2 neuromorphic LIF ensembles, hard WTA switching |
-| `"nm_softmix"` | 2 neuromorphic LIF ensembles, softmax-blended |
+| `"nm_softmix"` | 2 neuromorphic LIF ensembles, Beta-distribution blended |
 
-### Operators (13 total)
+### Operators (13 standard + 2 neuromorphic)
 
-| Type | Operator | Description                                        |
-|---|---|----------------------------------------------------|
-| Exploration | `LevyFlight` | Heavy-tailed random walk for escaping local minima |
-| Exploration | `DifferentialEvolution` | Memory-based directed recombination                |
-| Exploration | `ParticleSwarm` | Velocity-based swarm search                        |
-| Exploration | `SpiralOptimisation` | Anisotropic spiral trajectories                    |
-| Exploration | `RandomSearch` | Baseline uniform random sampling                   |
-| Exploration | `GravitationalSearch` | Mass-attraction directed exploration               |
-| Exploration | `FireflyAlgorithm` | Brightness-attraction swarm search                 |
-| Exploration | `CentralForce` | Newtonian gravitational force-based movement       |
-| Exploration | `GeneticCrossover` | Recombination of memory solutions                  |
-| Exploitation | `GeneticMutation` | Perturbation for diversity injection               |
-| Exploitation | `LocalRandomWalk` | Gaussian local refinement                          |
-| Exploitation | `SimulatedAnnealing` | Controlled stochastic local search                 |
-| Exploitation | `TabuSearch` | Memory-guided local search with avoidance          |
+| Type | Operator | Description                                          |
+|---|---|------------------------------------------------------|
+| Exploration | `LevyFlight` | Heavy-tailed random walk for escaping local minima   |
+| Exploration | `DifferentialEvolution` | Memory-based directed recombination                  |
+| Exploration | `RandomSearch` | Baseline uniform random sampling                     |
+| Exploration | `GravitationalSearch` | Mass-attraction directed exploration                 |
+| Exploration | `FireflyAlgorithm` | Brightness-attraction swarm search                   |
+| Exploration | `CentralForce` | Inverse-square-law attraction towards global best    |
+| Exploration | `GeneticCrossover` | Recombination of memory solutions                    |
+| Exploitation | `ParticleSwarm` | Velocity-based swarm with personal/global attraction |
+| Exploitation | `SpiralOptimisation` | Anisotropic logarithmic spiral convergence           |
+| Exploitation | `GeneticMutation` | Adaptive random perturbation of memory solutions     |
+| Exploitation | `LocalRandomWalk` | Cuckoo-search-inspired difference-vector walk        |
+| Exploitation | `SimulatedAnnealing` | Controlled stochastic local search                   |
+| Exploitation | `TabuSearch` | Memory-guided local search with avoidance            |
 
 ### State Features
 
@@ -110,7 +105,7 @@ python examples/basic_example.py --time 2.0 --dimensions 5
 ```
 
 ```bash
-python nevo/examples/benchmark_experiment.py --suite cocoex --problems 1-24 --dimensions 2,3,5,10
+python examples/benchmark_experiment.py --suite cocoex --problems 1-24 --dimensions 2,3,5,10
 ```
 
 ```bash
@@ -119,9 +114,15 @@ python examples/td_learning_examples.py
 
 ## Neuromorphic Modes
 
-On multimodal problems, spike-driven dynamics outperform tuned heuristics:
+The `nm_dual` and `nm_softmix` modes replace the 13 standard operators with two Nengo LIF spiking ensembles (exploration + exploitation):
 
 ```python
+import numpy as np
+from nevo import NEVOptimiser
+
+def rastrigin(x):
+    return float(10 * len(x) + np.sum(x**2 - 10 * np.cos(2 * np.pi * x)))
+
 optimiser = NEVOptimiser(
     objective_function=rastrigin,
     bounds=(-5.12, 5.12),
@@ -175,7 +176,7 @@ Also consider the related paper and dataset from Zenodo:
 
 ## License
 
-BSD 3-Clause License — see [LICENSE](LICENSE) file for details.
+BSD 3-Clause License; see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
