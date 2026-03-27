@@ -7,6 +7,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-03-23
+
 ### Added
 - `nm_dual` operator mode: hard winner-take-all switching between `NeuromorphicExplorationEnsemble` and `NeuromorphicExploitationEnsemble`.
 - `nm_softmix` operator mode: softmax-blended populations with configurable `temperature` and `concentration`.

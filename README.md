@@ -9,7 +9,9 @@
 - 🔄 **Adaptive TD learning** of operator utility weights
 - 🎯 **State-aware optimisation** with real-time feature extraction
 - 🔌 **Loihi-compatible** neural architectures
-- 📊 **Built-in visualisation** tools
+- 🚀 **Optional GPU acceleration** via `nengo-dl` / TensorFlow
+- 📊 **Built-in visualisation** tools with LaTeX-ready output
+- 🏆 **IOH / COCO benchmark** integration for reproducible experiments
 
 ## Installation
 
@@ -60,6 +62,9 @@ optimiser.run(time=20.0)
 # Get results
 x_best, f_best = optimiser.get_best_solution()
 print(f"Best fitness: {f_best:.6e}")
+
+# Access time-series probe data
+data = optimiser.simulator.data[optimiser.stats_probe]  # shape (T, 3)
 ```
 
 ## Architecture
@@ -72,17 +77,43 @@ NEVO uses a **basal ganglia** neural circuit to select between optimisation oper
 | `"nm_dual"` | 2 neuromorphic LIF ensembles, hard WTA switching |
 | `"nm_softmix"` | 2 neuromorphic LIF ensembles, softmax-blended |
 
-Selection is driven by three **state features**:
-- **Diversity**: Spread of solutions in search space.
-- **Improvement rate**: Recent success frequency.
-- **Convergence**: Fitness homogeneity.
+### Operators (13 total)
+
+| Type | Operator | Description                                        |
+|---|---|----------------------------------------------------|
+| Exploration | `LevyFlight` | Heavy-tailed random walk for escaping local minima |
+| Exploration | `DifferentialEvolution` | Memory-based directed recombination                |
+| Exploration | `ParticleSwarm` | Velocity-based swarm search                        |
+| Exploration | `SpiralOptimisation` | Anisotropic spiral trajectories                    |
+| Exploration | `RandomSearch` | Baseline uniform random sampling                   |
+| Exploration | `GravitationalSearch` | Mass-attraction directed exploration               |
+| Exploration | `FireflyAlgorithm` | Brightness-attraction swarm search                 |
+| Exploration | `CentralForce` | Newtonian gravitational force-based movement       |
+| Exploration | `GeneticCrossover` | Recombination of memory solutions                  |
+| Exploitation | `GeneticMutation` | Perturbation for diversity injection               |
+| Exploitation | `LocalRandomWalk` | Gaussian local refinement                          |
+| Exploitation | `SimulatedAnnealing` | Controlled stochastic local search                 |
+| Exploitation | `TabuSearch` | Memory-guided local search with avoidance          |
+
+### State Features
+
+Selection is based on a **3-D state vector** computed each timestep, which captures the current search dynamics as described below.
+- **Diversity**: spread of solutions in v-space `[-1, 1]^D`
+- **Improvement rate**: fraction of recent timesteps with fitness gain
+- **Convergence**: fitness homogeneity in the memory archive
 
 ## Examples
-
 See the `examples/` directory:
 
 ```bash
 python examples/basic_example.py --time 2.0 --dimensions 5
+```
+
+```bash
+python nevo/examples/benchmark_experiment.py --suite cocoex --problems 1-24 --dimensions 2,3,5,10
+```
+
+```bash
 python examples/td_learning_examples.py
 ```
 
@@ -106,17 +137,45 @@ optimiser.run(time=10.0)
 If you use NEVO in your research, please cite:
 
 ```bibtex
-@software{nevo2025,
-  title={NEVO: Neuromorphic Evolutionary Optimisation},
+@software{nevo2026repo,
+  title={NEVO: Neuromorphic EVolutionary Optimisation},
   author={Cruz-Duarte, Jorge Mario and Talbi, El-Ghazali},
-  year={2025},
+  year={2026},
   url={https://github.com/jcrvz/nevo}
 }
 ```
 
-## Licence
+Also consider the related paper and dataset from Zenodo:
 
-MIT Licence — see the [LICENSE](LICENSE) file for details.
+```bibtex
+@inproceedings{nevo2026cecpaper,
+    author    = {Cruz-Duarte, Jorge M. and Talbi, El-ghazali},
+    title     = {{NEVO: A Neuromorphic EVolutionary Optimiser with Spike-Driven Cortico-Basal-Thalamic Coordination}},
+    booktitle = {Proceedings of the 2026 IEEE Congress on Evolutionary Computation (CEC)},
+    year = {2026},
+    pages = {1--6},
+    venue = {Maastricht, Netherlands},
+    publisher = {IEEE},
+    note = {Accepted for publication},
+}
+```
+
+```bibtex
+@dataset{nevo2026cecdataset,
+  author    = {Cruz-Duarte, Jorge M. and Talbi, El-ghazali},
+  title     = {NEVO: A Neuromorphic EVolutionary Optimiser with Spike-Driven Cortico-Basal-Thalamic Coordination - Codes and Results},
+  month     = jan,
+  year      = 2026,
+  publisher = {Zenodo},
+  version   = {1.0.0},
+  doi       = {10.5281/zenodo.18444113},
+  url       = {https://doi.org/10.5281/zenodo.18444113},
+}
+```
+
+## License
+
+BSD 3-Clause License — see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
