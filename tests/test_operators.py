@@ -102,4 +102,3 @@ def test_operator_statistics():
     op.reset_statistics()
     assert op.usage_count == 0
     assert op.success_count == 0
-

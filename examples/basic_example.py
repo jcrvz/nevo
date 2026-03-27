@@ -7,13 +7,13 @@ standard benchmark functions from IOHexperimenter.
 """
 
 import argparse
-import numpy as np
 import matplotlib.pyplot as plt
 from ioh import get_problem
 
 from nevo import NEVOptimiser
 from nevo.utils import plot_optimisation_results, plot_operator_statistics
 import nevo.operators.standard as nev_ops
+
 
 def main(args=None):
     """Run basic NEVO optimisation example."""
@@ -57,31 +57,31 @@ def main(args=None):
         if not spec:
             return []
         ids = []
-        for part in spec.split(','):
+        for part in spec.split(","):
             part = part.strip()
             if not part:
                 continue
-            if '-' in part:
-                start, end = part.split('-', 1)
+            if "-" in part:
+                start, end = part.split("-", 1)
                 ids.extend(range(int(start), int(end) + 1))
             else:
                 ids.append(int(part))
         return ids
 
-    problem_ids = parse_id_list(opts.problem_ids) if opts.problem_ids else [opts.problem_id]
+    problem_ids = (
+        parse_id_list(opts.problem_ids) if opts.problem_ids else [opts.problem_id]
+    )
     problem_ins = opts.instance
     num_dims = opts.dimensions
     simulation_time = opts.time
 
-    print(f"Selected problem_ids={problem_ids}, instance={problem_ins}, dimensions={num_dims}, time={simulation_time}s")
+    print(
+        f"Selected problem_ids={problem_ids}, instance={problem_ins}, dimensions={num_dims}, time={simulation_time}s"
+    )
 
     for problem_id in problem_ids:
         # Get problem from IOHexperimenter
-        problem = get_problem(
-            fid=problem_id,
-            instance=problem_ins,
-            dimension=num_dims
-        )
+        problem = get_problem(fid=problem_id, instance=problem_ins, dimension=num_dims)
         problem.reset()
 
         print("=" * 70)
@@ -136,24 +136,26 @@ def main(args=None):
         print(f"Best fitness found: {f_best:.6e}")
         print(f"Optimal fitness:    {problem.optimum.y:.6e}")
         print(f"Error from optimum: {f_best - problem.optimum.y:.6e}")
-        print(f"Relative error:     {(f_best - problem.optimum.y) / abs(problem.optimum.y):.6e}")
+        print(
+            f"Relative error:     {(f_best - problem.optimum.y) / abs(problem.optimum.y):.6e}"
+        )
 
-        print(f"\nBest solution found:")
+        print("\nBest solution found:")
         print(f"  {x_best}")
-        print(f"\nOptimal solution:")
+        print("\nOptimal solution:")
         print(f"  {problem.optimum.x}")
 
         # Visualise results
         plot_optimisation_results(
             optimiser,
             optimum=problem.optimum.y,
-            title=f'f{problem_id:02d}-i{problem_ins:02d} {num_dims}D',
-            save_path=f'nevo_example_f{problem_id:02d}_i{problem_ins:02d}_{num_dims}D.png'
+            title=f"f{problem_id:02d}-i{problem_ins:02d} {num_dims}D",
+            save_path=f"nevo_example_f{problem_id:02d}_i{problem_ins:02d}_{num_dims}D.png",
         )
 
         plot_operator_statistics(
             optimiser,
-            save_path=f'nevo_operators_f{problem_id:02d}_i{problem_ins:02d}_{num_dims}D.png'
+            save_path=f"nevo_operators_f{problem_id:02d}_i{problem_ins:02d}_{num_dims}D.png",
         )
 
     plt.show()

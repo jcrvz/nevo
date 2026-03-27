@@ -13,6 +13,5 @@ __all__ = [
     "setup_plotting_style",
     "plot_optimisation_results",
     "plot_operator_statistics",
-    "generate_particle_svg"
+    "generate_particle_svg",
 ]
-

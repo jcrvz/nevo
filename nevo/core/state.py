@@ -3,16 +3,17 @@ State Feature Extraction
 =========================
 
 This module computes state features that describe the current
-optimization landscape and guide operator selection.
+optimisation landscape and guide operator selection.
 """
 
 import numpy as np
 from typing import Dict, Any, List
 
+EPS_MAX = 1e10
 
 class StateFeatures:
     """
-    Extracts interpretable features from optimization state.
+    Extracts interpretable features from optimisation state.
 
     Features:
     - diversity: Spread of solutions in search space [0, 1]
@@ -37,7 +38,7 @@ class StateFeatures:
         Parameters
         ----------
         state : Dict[str, Any]
-            Current optimization state containing:
+            Current optimisation state containing:
             - memory_vectors: np.ndarray of shape (MU, D)
             - memory_fitness: np.ndarray of shape (MU,)
             - f_default_worst: float (sentinel value for invalid solutions)
@@ -48,26 +49,28 @@ class StateFeatures:
             Feature vector [diversity, improvement_rate, convergence]
         """
         features = {
-            "diversity": 0.5,
+            "diversity":        0.5,
             "improvement_rate": 0.5,
-            "convergence": 0.0,
+            "convergence":      0.0,
         }
 
         # Extract state components
         memory_fitness = state.get("memory_fitness", np.array([]))
         memory_vectors = state.get("memory_vectors", np.array([]))
-        f_default_worst = state.get("f_default_worst", 1e10)
+        f_default_worst = state.get("f_default_worst", EPS_MAX)
 
         # Filter valid solutions
         valid_mask = memory_fitness < f_default_worst
         n_valid = np.sum(valid_mask)
 
         if n_valid < 2:
-            return np.array([
-                features["diversity"],
-                features["improvement_rate"],
-                features["convergence"]
-            ])
+            return np.array(
+                [
+                    features["diversity"],
+                    features["improvement_rate"],
+                    features["convergence"],
+                ]
+            )
 
         valid_fitness = memory_fitness[valid_mask]
         valid_vectors = memory_vectors[valid_mask]
@@ -82,7 +85,7 @@ class StateFeatures:
 
         # 2. IMPROVEMENT RATE: Fraction of recent improvements
         if len(self.improvement_history) >= 10:
-            recent = self.improvement_history[-self.history_length:]
+            recent = self.improvement_history[-self.history_length :]
             rate = np.mean(recent)
             features["improvement_rate"] = float(rate)
 
@@ -102,11 +105,13 @@ class StateFeatures:
             convergence = 1.0 - np.clip(f_range / 100.0, 0.0, 1.0)
             features["convergence"] = float(convergence)
 
-        return np.array([
-            features["diversity"],
-            features["improvement_rate"],
-            features["convergence"]
-        ])
+        return np.array(
+            [
+                features["diversity"],
+                features["improvement_rate"],
+                features["convergence"],
+            ]
+        )
 
     def update_improvement_history(self, improved: bool):
         """
@@ -120,7 +125,7 @@ class StateFeatures:
         self.improvement_history.append(1.0 if improved else 0.0)
         # Keep only recent history
         if len(self.improvement_history) > self.history_length * 2:
-            self.improvement_history = self.improvement_history[-self.history_length:]
+            self.improvement_history = self.improvement_history[-self.history_length :]
 
     def reset(self):
         """Reset improvement history."""
@@ -131,12 +136,12 @@ def compute_fitness_weighted_centre(state: Dict[str, Any]) -> np.ndarray:
     """
     Compute fitness-weighted centroid from memory.
 
-    Uses rank-based weighting to emphasize better solutions.
+    Uses rank-based weighting to emphasise better solutions.
 
     Parameters
     ----------
     state : Dict[str, Any]
-        Optimization state containing memory
+        optimisation state containing memory
 
     Returns
     -------
@@ -145,7 +150,7 @@ def compute_fitness_weighted_centre(state: Dict[str, Any]) -> np.ndarray:
     """
     memory_fitness = state.get("memory_fitness", np.array([]))
     memory_vectors = state.get("memory_vectors", np.array([]))
-    f_default_worst = state.get("f_default_worst", 1e10)
+    f_default_worst = state.get("f_default_worst", EPS_MAX)
 
     valid_mask = memory_fitness < f_default_worst
 
@@ -163,4 +168,3 @@ def compute_fitness_weighted_centre(state: Dict[str, Any]) -> np.ndarray:
     weights /= np.sum(weights)
 
     return np.average(valid_vectors, axis=0, weights=weights)
-

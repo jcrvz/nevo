@@ -63,7 +63,9 @@ class BenchmarkProblem:
         elif self.suite in ["cocoex", "coco"]:
             self._load_coco_problem()
         else:
-            raise ValueError(f"Unknown suite: {self.suite}. Use 'ioh' or 'coco|cocoex'.")
+            raise ValueError(
+                f"Unknown suite: {self.suite}. Use 'ioh' or 'coco|cocoex'."
+            )
 
     def _load_ioh_problem(self):
         """Load problem from IOH suite."""
@@ -103,7 +105,6 @@ class BenchmarkProblem:
                 f"instance {self.instance} dimension {self.dimension}"
             )
 
-
         # COCO bounds are typically [-5, 5] for bbob
         lb = np.array(self._problem.lower_bounds)
         ub = np.array(self._problem.upper_bounds)
@@ -119,7 +120,7 @@ class BenchmarkProblem:
 
     def reset(self):
         """Reset the problem (if supported)."""
-        if self.suite == "ioh" and hasattr(self._problem, 'reset'):
+        if self.suite == "ioh" and hasattr(self._problem, "reset"):
             self._problem.reset()
 
     @property
@@ -164,25 +165,39 @@ def _run_coco_batch(args_tuple):
     Each worker runs a complete batch with its own observer.
     COCO observer automatically appends to existing data files, enabling resume.
     """
-    (problems, instances, dimensions, simulation_time, n_runs,
-     algorithm_name, output_dir, total_batches, batch_number, use_dl) = args_tuple
+    (
+        problems,
+        instances,
+        dimensions,
+        simulation_time,
+        n_runs,
+        algorithm_name,
+        output_dir,
+        total_batches,
+        batch_number,
+        use_dl,
+    ) = args_tuple
 
     import cocoex
     import nengo
 
     # Disable Nengo cache to avoid multiprocessing lock issues
-    nengo.rc.set('decoder_cache', 'enabled', 'False')
+    nengo.rc.set("decoder_cache", "enabled", "False")
 
     all_results = []
 
     # Create observer for this batch
     # Use unique folder name for each batch to avoid conflicts during parallel execution
-    batch_folder = f"{algorithm_name}_batch{batch_number:03d}" if total_batches > 1 else algorithm_name
+    batch_folder = (
+        f"{algorithm_name}_batch{batch_number:03d}"
+        if total_batches > 1
+        else algorithm_name
+    )
     observer = cocoex.Observer(
         "bbob",
         f"result_folder: {batch_folder} "
         f"algorithm_name: {algorithm_name} "
-        f"algorithm_info: \"NEVO neuromorphic optimiser\""
+        f'algorithm_info: "NEVO neuromorphic optimiser"',
     )
 
     # Suite configuration strings (COCO uses comma-separated values for lists)
@@ -215,17 +230,22 @@ def _run_coco_batch(args_tuple):
 
             seed = problem_id * 1000 + instance * 100 + run
 
-            print(f"[Batch {batch_number+1}/{total_batches}] "
-                  f"f{problem_id:02d}, i{instance}, {dimension}D, run {run+1}/{n_runs}")
+            print(
+                f"[Batch {batch_number + 1}/{total_batches}] "
+                f"f{problem_id:02d}, i{instance}, {dimension}D, run {run + 1}/{n_runs}"
+            )
 
             # Check if this specific run already exists (for resuming interrupted experiments)
             if output_dir is not None:
-                run_results_file = Path(output_dir) / f'results_f{problem_id:02d}_i{instance:02d}_{dimension}D_run{run+1:02d}.csv'
+                run_results_file = (
+                    Path(output_dir)
+                    / f"results_f{problem_id:02d}_i{instance:02d}_{dimension}D_run{run + 1:02d}.csv"
+                )
                 if run_results_file.exists():
                     try:
                         existing_result = pd.read_csv(run_results_file)
                         if len(existing_result) > 0:
-                            print(f"  -> Skipping (already completed)")
+                            print("  -> Skipping (already completed)")
                             all_results.append(existing_result.iloc[0].to_dict())
                             continue
                     except Exception:
@@ -241,11 +261,11 @@ def _run_coco_batch(args_tuple):
                 bounds=(lb, ub),
                 dimension=dimension,
                 population_size=50,  # Increased from 50 for better exploration
-                memory_size=25,       # Increased from 25 for better diversity
+                memory_size=25,  # Increased from 25 for better diversity
                 neurons_per_ensemble=50,  # Increased from 50 for better action selection
                 dt=0.001,
-                epsilon=0.15,         # Slightly more exploration (was 0.1)
-                learning_rate=0.3,    # Slightly lower for stability (was 0.4)
+                epsilon=0.15,  # Slightly more exploration (was 0.1)
+                learning_rate=0.3,  # Slightly lower for stability (was 0.4)
                 seed=seed,
             )
 
@@ -260,42 +280,47 @@ def _run_coco_batch(args_tuple):
 
             # Store results
             result = {
-                'suite': 'cocoex',
-                'problem_id': problem_id,
-                'problem_name': problem.name,
-                'instance': instance,
-                'dimension': dimension,
-                'run': run + 1,
-                'batch': batch_number + 1,
-                'seed': seed,
-                'best_fitness': f_best,
-                'optimal_fitness': None,
-                'error': None,
-                'relative_error': None,
-                'total_evaluations': stats['total_evaluations'],
-                'wall_time': elapsed,
-                'evals_per_second': stats['total_evaluations'] / elapsed,
+                "suite": "cocoex",
+                "problem_id": problem_id,
+                "problem_name": problem.name,
+                "instance": instance,
+                "dimension": dimension,
+                "run": run + 1,
+                "batch": batch_number + 1,
+                "seed": seed,
+                "best_fitness": f_best,
+                "optimal_fitness": None,
+                "error": None,
+                "relative_error": None,
+                "total_evaluations": stats["total_evaluations"],
+                "wall_time": elapsed,
+                "evals_per_second": stats["total_evaluations"] / elapsed,
             }
 
             # Add operator statistics
-            for op_name, count in stats['operator_counts'].items():
-                result[f'op_count_{op_name}'] = count
-                result[f'op_weight_{op_name}'] = stats['operator_weights'][op_name]
-                result[f'op_success_{op_name}'] = stats['operator_success_rates'][op_name]
+            for op_name, count in stats["operator_counts"].items():
+                result[f"op_count_{op_name}"] = count
+                result[f"op_weight_{op_name}"] = stats["operator_weights"][op_name]
+                result[f"op_success_{op_name}"] = stats["operator_success_rates"][
+                    op_name
+                ]
 
             all_results.append(result)
 
             # Save intermediate results
             if output_dir is not None:
                 pd.DataFrame([result]).to_csv(
-                    Path(output_dir) / f'results_f{problem_id:02d}_i{instance:02d}_{dimension}D_run{run+1:02d}.csv',
-                    index=False
+                    Path(output_dir)
+                    / f"results_f{problem_id:02d}_i{instance:02d}_{dimension}D_run{run + 1:02d}.csv",
+                    index=False,
                 )
 
     return all_results
 
 
-def _merge_coco_batch_folders(algorithm_name: str, n_batches: int, exdata_dir: str = "exdata"):
+def _merge_coco_batch_folders(
+    algorithm_name: str, n_batches: int, exdata_dir: str = "exdata"
+):
     """
     Merge COCO batch folders into a single folder.
 
@@ -344,9 +369,9 @@ def _merge_coco_batch_folders(algorithm_name: str, n_batches: int, exdata_dir: s
                         target_subitem = target_item / subitem.name
                         if target_subitem.exists():
                             # Append data to existing file
-                            if subitem.suffix in ['.dat', '.tdat', '.rdat', '.mdat']:
-                                with open(target_subitem, 'a') as dst:
-                                    with open(subitem, 'r') as src:
+                            if subitem.suffix in [".dat", ".tdat", ".rdat", ".mdat"]:
+                                with open(target_subitem, "a") as dst:
+                                    with open(subitem, "r") as src:
                                         dst.write(src.read())
                         else:
                             shutil.copy2(subitem, target_subitem)
@@ -354,21 +379,21 @@ def _merge_coco_batch_folders(algorithm_name: str, n_batches: int, exdata_dir: s
                     shutil.copytree(item, target_item)
             else:
                 # For .info files, merge them
-                if item.suffix == '.info':
+                if item.suffix == ".info":
                     if target_item.exists():
                         # Append to existing .info file (skip header for subsequent batches)
-                        with open(target_item, 'a') as dst:
-                            with open(item, 'r') as src:
+                        with open(target_item, "a") as dst:
+                            with open(item, "r") as src:
                                 content = src.read()
                                 # Skip the first line (header) if target already has content
-                                lines = content.split('\n')
+                                lines = content.split("\n")
                                 # Find where data lines start (after % comments)
                                 data_start = 0
                                 for i, line in enumerate(lines):
-                                    if line.startswith('data_'):
+                                    if line.startswith("data_"):
                                         data_start = i
                                         break
-                                dst.write('\n' + '\n'.join(lines[data_start:]))
+                                dst.write("\n" + "\n".join(lines[data_start:]))
                     else:
                         shutil.copy2(item, target_item)
                 else:
@@ -428,7 +453,7 @@ def run_coco_benchmark(
     import multiprocessing as mp
 
     # Use spawn to avoid fork issues with Nengo on macOS/Linux
-    ctx = mp.get_context('spawn')
+    ctx = mp.get_context("spawn")
 
     # Number of batches equals number of cores
     total_batches = n_cores
@@ -436,18 +461,20 @@ def run_coco_benchmark(
     # Build batch arguments
     batch_args = []
     for batch_number in range(total_batches):
-        batch_args.append((
-            problems,
-            instances,
-            dimensions,
-            simulation_time,
-            n_runs,
-            algorithm_name,
-            str(output_dir) if output_dir else None,
-            total_batches,
-            batch_number,
-            use_dl,
-        ))
+        batch_args.append(
+            (
+                problems,
+                instances,
+                dimensions,
+                simulation_time,
+                n_runs,
+                algorithm_name,
+                str(output_dir) if output_dir else None,
+                total_batches,
+                batch_number,
+                use_dl,
+            )
+        )
 
     # Run batches
     all_results = []
@@ -512,18 +539,23 @@ def run_benchmark(
     results = []
 
     for run in range(n_runs):
-        print(f"\n{'='*70}")
-        print(f"[{suite.upper()}] Problem f{problem_id:02d}, Instance {instance}, Dimension {dimension}D, Run {run+1}/{n_runs}")
-        print(f"{'='*70}")
+        print(f"\n{'=' * 70}")
+        print(
+            f"[{suite.upper()}] Problem f{problem_id:02d}, Instance {instance}, Dimension {dimension}D, Run {run + 1}/{n_runs}"
+        )
+        print(f"{'=' * 70}")
 
         # Check if this specific run already exists (for resuming interrupted experiments)
         if output_dir is not None:
-            run_results_file = Path(output_dir) / f'results_f{problem_id:02d}_i{instance:02d}_{dimension}D_run{run+1:02d}.csv'
+            run_results_file = (
+                Path(output_dir)
+                / f"results_f{problem_id:02d}_i{instance:02d}_{dimension}D_run{run + 1:02d}.csv"
+            )
             if run_results_file.exists():
                 try:
                     existing_result = pd.read_csv(run_results_file)
                     if len(existing_result) > 0:
-                        print(f"  -> Skipping run {run+1} (already completed)")
+                        print(f"  -> Skipping run {run + 1} (already completed)")
                         results.append(existing_result.iloc[0].to_dict())
                         continue
                 except Exception:
@@ -544,11 +576,11 @@ def run_benchmark(
             bounds=problem.bounds,
             dimension=dimension,
             population_size=100,  # Increased for better exploration
-            memory_size=50,       # Increased for better diversity
+            memory_size=50,  # Increased for better diversity
             neurons_per_ensemble=100,  # Increased for better action selection
             dt=0.001,
-            epsilon=0.15,         # Slightly more exploration
-            learning_rate=0.3,    # Slightly lower for stability
+            epsilon=0.15,  # Slightly more exploration
+            learning_rate=0.3,  # Slightly lower for stability
             seed=seed_offset + run,
         )
 
@@ -563,33 +595,37 @@ def run_benchmark(
 
         # Store results
         result = {
-            'suite': suite,
-            'problem_id': problem_id,
-            'problem_name': problem.name,
-            'instance': instance,
-            'dimension': dimension,
-            'run': run + 1,
-            'seed': seed_offset + run,
-            'best_fitness': f_best,
-            'optimal_fitness': problem.optimum,
-            'total_evaluations': stats['total_evaluations'],
-            'wall_time': elapsed,
-            'evals_per_second': stats['total_evaluations'] / elapsed,
+            "suite": suite,
+            "problem_id": problem_id,
+            "problem_name": problem.name,
+            "instance": instance,
+            "dimension": dimension,
+            "run": run + 1,
+            "seed": seed_offset + run,
+            "best_fitness": f_best,
+            "optimal_fitness": problem.optimum,
+            "total_evaluations": stats["total_evaluations"],
+            "wall_time": elapsed,
+            "evals_per_second": stats["total_evaluations"] / elapsed,
         }
 
         # Add error metrics only if optimum is known (not for COCO)
         if problem.optimum is not None:
-            result['error'] = f_best - problem.optimum
-            result['relative_error'] = (f_best - problem.optimum) / abs(problem.optimum) if problem.optimum != 0 else f_best
+            result["error"] = f_best - problem.optimum
+            result["relative_error"] = (
+                (f_best - problem.optimum) / abs(problem.optimum)
+                if problem.optimum != 0
+                else f_best
+            )
         else:
-            result['error'] = None
-            result['relative_error'] = None
+            result["error"] = None
+            result["relative_error"] = None
 
         # Add operator statistics
-        for op_name, count in stats['operator_counts'].items():
-            result[f'op_count_{op_name}'] = count
-            result[f'op_weight_{op_name}'] = stats['operator_weights'][op_name]
-            result[f'op_success_{op_name}'] = stats['operator_success_rates'][op_name]
+        for op_name, count in stats["operator_counts"].items():
+            result[f"op_count_{op_name}"] = count
+            result[f"op_weight_{op_name}"] = stats["operator_weights"][op_name]
+            result[f"op_success_{op_name}"] = stats["operator_success_rates"][op_name]
 
         results.append(result)
 
@@ -598,8 +634,8 @@ def run_benchmark(
             plot_optimisation_results(
                 optimiser,
                 optimum=problem.optimum,
-                title=f'[{suite.upper()}] f{problem_id:02d} i{instance:02d} {dimension}D',
-                save_path=f'benchmark_{suite}_f{problem_id:02d}_i{instance:02d}_{dimension}D.png'
+                title=f"[{suite.upper()}] f{problem_id:02d} i{instance:02d} {dimension}D",
+                save_path=f"benchmark_{suite}_f{problem_id:02d}_i{instance:02d}_{dimension}D.png",
             )
 
         # Finalize the problem to flush COCO data
@@ -626,18 +662,31 @@ def run_single_experiment(args_tuple):
     import nengo
 
     # Disable Nengo cache to avoid multiprocessing lock issues
-    nengo.rc.set('decoder_cache', 'enabled', 'False')
+    nengo.rc.set("decoder_cache", "enabled", "False")
 
-    (problem_id, instance, dimension, simulation_time, n_runs,
-     seed_offset, suite, output_dir, algorithm_name) = args_tuple
+    (
+        problem_id,
+        instance,
+        dimension,
+        simulation_time,
+        n_runs,
+        seed_offset,
+        suite,
+        output_dir,
+        algorithm_name,
+    ) = args_tuple
 
     # Check if results already exist (for resuming interrupted experiments)
-    results_file = output_dir / f'results_f{problem_id:02d}_i{instance:02d}_{dimension}D.csv'
+    results_file = (
+        output_dir / f"results_f{problem_id:02d}_i{instance:02d}_{dimension}D.csv"
+    )
     if results_file.exists():
         try:
             existing_df = pd.read_csv(results_file)
             if len(existing_df) >= n_runs:
-                print(f"[{suite.upper()}] Skipping f{problem_id:02d}, i{instance}, {dimension}D (already completed)")
+                print(
+                    f"[{suite.upper()}] Skipping f{problem_id:02d}, i{instance}, {dimension}D (already completed)"
+                )
                 return existing_df
         except Exception:
             pass  # Ignore corrupted files, re-run
@@ -653,9 +702,8 @@ def run_single_experiment(args_tuple):
             "bbob",
             f"result_folder: {algorithm_name} "
             f"algorithm_name: {algorithm_name} "
-            f"algorithm_info: \"NEVO neuromorphic optimiser\""
+            f'algorithm_info: "NEVO neuromorphic optimiser"',
         )
-
 
     results_df = run_benchmark(
         problem_id=problem_id,
@@ -670,8 +718,8 @@ def run_single_experiment(args_tuple):
 
     # Save intermediate results
     results_df.to_csv(
-        output_dir / f'results_f{problem_id:02d}_i{instance:02d}_{dimension}D.csv',
-        index=False
+        output_dir / f"results_f{problem_id:02d}_i{instance:02d}_{dimension}D.csv",
+        index=False,
     )
 
     return results_df
@@ -824,9 +872,9 @@ def main():
     elif n_cores < 0:
         n_cores = max(1, cpu_count() + n_cores)
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("NEVO BENCHMARK EXPERIMENT")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Suite:        {args.suite.upper()}")
     print(f"Problems:     {args.problems}")
     print(f"Instances:    {args.instances}")
@@ -840,8 +888,8 @@ def main():
         print(f"Batches:      {n_cores} (1 per core)")
         print(f"COCO data:    exdata/{args.algorithm_name}")
     if args.use_dl:
-        print(f"Backend:      NengoDL (GPU accelerated)")
-    print(f"{'='*70}\n")
+        print("Backend:      NengoDL (GPU accelerated)")
+    print(f"{'=' * 70}\n")
 
     # Build list of experiments
     experiments = []
@@ -849,20 +897,21 @@ def main():
         for instance in args.instances:
             for dimension in args.dimensions:
                 seed_offset = problem_id * 1000 + instance * 100
-                experiments.append((
-                    problem_id,
-                    instance,
-                    dimension,
-                    args.time,
-                    args.runs,
-                    seed_offset,
-                    args.suite,
-                    output_dir,
-                    args.algorithm_name,
-                ))
+                experiments.append(
+                    (
+                        problem_id,
+                        instance,
+                        dimension,
+                        args.time,
+                        args.runs,
+                        seed_offset,
+                        args.suite,
+                        output_dir,
+                        args.algorithm_name,
+                    )
+                )
 
     print(f"Total experiments: {len(experiments)}")
-
 
     # Run experiments
     all_results = []
@@ -891,53 +940,61 @@ def main():
         else:
             # Parallel execution with spawn context to avoid Nengo issues
             import multiprocessing as mp
-            ctx = mp.get_context('spawn')
+
+            ctx = mp.get_context("spawn")
             with ctx.Pool(processes=n_cores) as pool:
                 all_results = pool.map(run_single_experiment, experiments)
 
         # Combine all results
         combined_df = pd.concat(all_results, ignore_index=True)
-    combined_df.to_csv(output_dir / 'all_results.csv', index=False)
+    combined_df.to_csv(output_dir / "all_results.csv", index=False)
 
     # Summary statistics (handle COCO case where error is None)
     if args.suite == "cocoex":
         # For COCO, only aggregate non-error metrics
-        summary = combined_df.groupby(['suite', 'problem_id', 'dimension']).agg({
-            'best_fitness': ['mean', 'std', 'min', 'max'],
-            'total_evaluations': 'mean',
-            'wall_time': 'mean',
-        })
+        summary = combined_df.groupby(["suite", "problem_id", "dimension"]).agg(
+            {
+                "best_fitness": ["mean", "std", "min", "max"],
+                "total_evaluations": "mean",
+                "wall_time": "mean",
+            }
+        )
     else:
-        summary = combined_df.groupby(['suite', 'problem_id', 'dimension']).agg({
-            'error': ['mean', 'std', 'min', 'max'],
-            'total_evaluations': 'mean',
-            'wall_time': 'mean',
-        })
+        summary = combined_df.groupby(["suite", "problem_id", "dimension"]).agg(
+            {
+                "error": ["mean", "std", "min", "max"],
+                "total_evaluations": "mean",
+                "wall_time": "mean",
+            }
+        )
 
-    summary.to_csv(output_dir / 'summary_statistics.csv')
+    summary.to_csv(output_dir / "summary_statistics.csv")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("BENCHMARK COMPLETE")
-    print("="*70)
+    print("=" * 70)
     print(f"\nResults saved to: {output_dir}")
-    print(f"\nSummary statistics:")
+    print("\nSummary statistics:")
     print(summary)
 
     # Print cocopp postprocessing instructions for COCO suite
     if args.suite == "cocoex":
-        print("\n" + "-"*70)
+        print("\n" + "-" * 70)
         print("COCO POSTPROCESSING")
-        print("-"*70)
-        print(f"\nTo postprocess results with cocopp, run:")
+        print("-" * 70)
+        print("\nTo postprocess results with cocopp, run:")
         print(f"  python -m cocopp exdata/{args.algorithm_name}")
-        print(f"\nOr to compare with other algorithms:")
-        print(f"  python -m cocopp exdata/{args.algorithm_name} <other_algorithm_folder>")
-        print(f"\nAn example could be:")
-        print(f"  python -m cocopp exdata/{args.algorithm_name} bbob/2009/RANDOMSEARCH bbob/2009/PSO! bbob/2012/DE!")
-        print(f"\nResults will be generated in the 'ppdata' folder.")
-        print("-"*70)
+        print("\nOr to compare with other algorithms:")
+        print(
+            f"  python -m cocopp exdata/{args.algorithm_name} <other_algorithm_folder>"
+        )
+        print("\nAn example could be:")
+        print(
+            f"  python -m cocopp exdata/{args.algorithm_name} bbob/2009/RANDOMSEARCH bbob/2009/PSO! bbob/2012/DE!"
+        )
+        print("\nResults will be generated in the 'ppdata' folder.")
+        print("-" * 70)
 
 
 if __name__ == "__main__":
     main()
-

@@ -1,13 +1,13 @@
-# NEVO - Neuromorphic Evolutionary Optimisation
+# NEVO — Neuromorphic Evolutionary Optimisation
 
-**NEVO** (Neuromorphic EVolutionary Optimisation) is a Python framework that bridges evolutionary computation and neuromorphic computing. It uses spiking neural networks to adaptively select and coordinate optimisation operators in real-time.
+**NEVO** (Neuromorphic EVolutionary Optimisation) is a Python framework that bridges evolutionary computation and neuromorphic computing. It uses spiking neural networks to adaptively select and coordinate optimisation operators in real time.
 
 ## Key Features
 
-- 🧠 **Neuromorphic operator selection** using basal ganglia circuits (Nengo)
-- ⚡ **13 built-in operators** covering exploration and exploitation strategies
-- 🔄 **Adaptive utility-weight learning** with epsilon-greedy selection
-- 🎯 **State-aware optimisation** with real-time 3-D feature extraction (diversity, improvement rate, convergence)
+- 🧠 **Neuromorphic operator selection** using basal ganglia circuits
+- ⚡ **Population-based parallel evaluation** at each simulation timestep
+- 🔄 **Adaptive TD learning** of operator utility weights
+- 🎯 **State-aware optimisation** with real-time feature extraction
 - 🔌 **Loihi-compatible** neural architectures
 - 🚀 **Optional GPU acceleration** via `nengo-dl` / TensorFlow
 - 📊 **Built-in visualisation** tools with LaTeX-ready output
@@ -33,9 +33,10 @@ pip install -e .
 
 ```bash
 uv pip install -e .
-# include dev dependencies
-uv pip install -e . --extra dev
+uv pip install -e . --extra dev   # includes dev dependencies
 ```
+
+NEVO uses `pyproject.toml` for dependency management and build configuration.
 
 ## Quick Start
 
@@ -68,7 +69,13 @@ data = optimiser.simulator.data[optimiser.stats_probe]  # shape (T, 3)
 
 ## Architecture
 
-NEVO uses a **basal ganglia** neural circuit to select between multiple optimisation operators based on the current search state.
+NEVO uses a **basal ganglia** neural circuit to select between optimisation operators. Three operator modes are available:
+
+| `operator_mode` | Description |
+|---|---|
+| `"trad"` | 13 standard heuristic operators (default) |
+| `"nm_dual"` | 2 neuromorphic LIF ensembles, hard WTA switching |
+| `"nm_softmix"` | 2 neuromorphic LIF ensembles, softmax-blended |
 
 ### Operators (13 total)
 
@@ -96,18 +103,34 @@ Selection is based on a **3-D state vector** computed each timestep, which captu
 - **Convergence**: fitness homogeneity in the memory archive
 
 ## Examples
+See the `examples/` directory:
 
 ```bash
-python nevo/examples/basic_example.py
+python examples/basic_example.py --time 2.0 --dimensions 5
+```
+
+```bash
 python nevo/examples/benchmark_experiment.py --suite cocoex --problems 1-24 --dimensions 2,3,5,10
 ```
 
-## Neuromorphic Benefits
+```bash
+python examples/td_learning_examples.py
+```
 
-1. **Adaptive Selection**: Neural circuits learn which operators work best online
-2. **Parallel Processing**: Population-based evaluation across dimensions
-3. **Energy Efficiency**: Designed for neuromorphic hardware (e.g., Intel Loihi 2, SpiNNaker)
-4. **Biological Inspiration**: Mimics Cortico-Basal Ganglia-Thalamic Loops
+## Neuromorphic Modes
+
+On multimodal problems, spike-driven dynamics outperform tuned heuristics:
+
+```python
+optimiser = NEVOptimiser(
+    objective_function=rastrigin,
+    bounds=(-5.12, 5.12),
+    dimension=10,
+    operator_mode="nm_dual",
+    population_size=30,
+)
+optimiser.run(time=10.0)
+```
 
 ## Citation
 
@@ -156,6 +179,9 @@ BSD 3-Clause License — see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome. Please submit a pull request.
 
+## Related Projects
 
+- [Nengo](https://www.nengo.ai/) — Neural Engineering Framework
+- [IOHexperimenter](https://iohprofiler.github.io/) — Benchmarking suite

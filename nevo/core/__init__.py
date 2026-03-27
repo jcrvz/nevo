@@ -12,4 +12,3 @@ __all__ = [
     "compute_fitness_weighted_centre",
     "BasalGangliaSelector",
 ]
-

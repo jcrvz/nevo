@@ -23,21 +23,25 @@ def parse_results_filename(filename: str) -> dict:
 
     Expected format: results_f{problem:02d}_i{instance:02d}_{dimension}D_run{run:02d}.csv
     """
-    pattern = r'results_f(\d+)_i(\d+)_(\d+)D_run(\d+)\.csv'
+    pattern = r"results_f(\d+)_i(\d+)_(\d+)D_run(\d+)\.csv"
     match = re.match(pattern, filename)
     if match:
         return {
-            'problem': int(match.group(1)),
-            'instance': int(match.group(2)),
-            'dimension': int(match.group(3)),
-            'run': int(match.group(4)),
+            "problem": int(match.group(1)),
+            "instance": int(match.group(2)),
+            "dimension": int(match.group(3)),
+            "run": int(match.group(4)),
         }
     return None
 
 
-def check_progress(output_dir: Path, expected_problems: list = None,
-                   expected_instances: list = None, expected_dimensions: list = None,
-                   expected_runs: int = 1):
+def check_progress(
+    output_dir: Path,
+    expected_problems: list = None,
+    expected_instances: list = None,
+    expected_dimensions: list = None,
+    expected_runs: int = 1,
+):
     """
     Check the progress of benchmark experiments.
 
@@ -62,10 +66,12 @@ def check_progress(output_dir: Path, expected_problems: list = None,
         expected_dimensions = [2, 3, 5, 10]
 
     # Find all per-run result files
-    result_files = list(output_dir.glob('results_f*_i*_*D_run*.csv'))
+    result_files = list(output_dir.glob("results_f*_i*_*D_run*.csv"))
 
     # Parse all filenames
-    completed = defaultdict(lambda: defaultdict(lambda: defaultdict(set)))  # problem -> instance -> dimension -> {runs}
+    completed = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(set))
+    )  # problem -> instance -> dimension -> {runs}
 
     for f in result_files:
         parsed = parse_results_filename(f.name)
@@ -74,12 +80,19 @@ def check_progress(output_dir: Path, expected_problems: list = None,
             try:
                 df = pd.read_csv(f)
                 if len(df) > 0:
-                    completed[parsed['problem']][parsed['instance']][parsed['dimension']].add(parsed['run'])
+                    completed[parsed["problem"]][parsed["instance"]][
+                        parsed["dimension"]
+                    ].add(parsed["run"])
             except Exception:
                 pass  # Skip corrupted files
 
     # Calculate statistics
-    total_expected = len(expected_problems) * len(expected_instances) * len(expected_dimensions) * expected_runs
+    total_expected = (
+        len(expected_problems)
+        * len(expected_instances)
+        * len(expected_dimensions)
+        * expected_runs
+    )
     total_completed = sum(
         len(runs)
         for prob_data in completed.values()
@@ -88,26 +101,32 @@ def check_progress(output_dir: Path, expected_problems: list = None,
     )
 
     # Print summary
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("BENCHMARK PROGRESS REPORT")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Output directory: {output_dir}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
-    print(f"Expected configuration:")
-    print(f"  Problems:   {len(expected_problems)} (f{min(expected_problems):02d}-f{max(expected_problems):02d})")
-    print(f"  Instances:  {len(expected_instances)} (i{min(expected_instances):02d}-i{max(expected_instances):02d})")
+    print("Expected configuration:")
+    print(
+        f"  Problems:   {len(expected_problems)} (f{min(expected_problems):02d}-f{max(expected_problems):02d})"
+    )
+    print(
+        f"  Instances:  {len(expected_instances)} (i{min(expected_instances):02d}-i{max(expected_instances):02d})"
+    )
     print(f"  Dimensions: {expected_dimensions}")
     print(f"  Runs:       {expected_runs}")
     print(f"  Total:      {total_expected} experiments\n")
 
-    print(f"Completed: {total_completed}/{total_expected} ({100*total_completed/total_expected:.1f}%)")
+    print(
+        f"Completed: {total_completed}/{total_expected} ({100 * total_completed / total_expected:.1f}%)"
+    )
     print(f"Remaining: {total_expected - total_completed}\n")
 
     # Breakdown by dimension
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print("BREAKDOWN BY DIMENSION")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     for dim in sorted(expected_dimensions):
         dim_expected = len(expected_problems) * len(expected_instances) * expected_runs
@@ -120,16 +139,18 @@ def check_progress(output_dir: Path, expected_problems: list = None,
         )
         pct = 100 * dim_completed / dim_expected if dim_expected > 0 else 0
         bar_len = int(pct / 5)
-        bar = '█' * bar_len + '░' * (20 - bar_len)
+        bar = "█" * bar_len + "░" * (20 - bar_len)
         print(f"  {dim:3d}D: {bar} {dim_completed:4d}/{dim_expected:4d} ({pct:5.1f}%)")
 
     # Breakdown by problem
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("BREAKDOWN BY PROBLEM")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     for prob in sorted(expected_problems):
-        prob_expected = len(expected_instances) * len(expected_dimensions) * expected_runs
+        prob_expected = (
+            len(expected_instances) * len(expected_dimensions) * expected_runs
+        )
         prob_completed = sum(
             len(runs)
             for inst_data in completed.get(prob, {}).values()
@@ -137,13 +158,15 @@ def check_progress(output_dir: Path, expected_problems: list = None,
         )
         pct = 100 * prob_completed / prob_expected if prob_expected > 0 else 0
         bar_len = int(pct / 5)
-        bar = '█' * bar_len + '░' * (20 - bar_len)
-        print(f"  f{prob:02d}: {bar} {prob_completed:4d}/{prob_expected:4d} ({pct:5.1f}%)")
+        bar = "█" * bar_len + "░" * (20 - bar_len)
+        print(
+            f"  f{prob:02d}: {bar} {prob_completed:4d}/{prob_expected:4d} ({pct:5.1f}%)"
+        )
 
     # Find missing experiments
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("MISSING EXPERIMENTS")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     missing = []
     for prob in expected_problems:
@@ -167,13 +190,13 @@ def check_progress(output_dir: Path, expected_problems: list = None,
     else:
         print("\n✓ All experiments completed!")
 
-    print(f"\n{'='*70}\n")
+    print(f"\n{'=' * 70}\n")
 
     return {
-        'total_expected': total_expected,
-        'total_completed': total_completed,
-        'missing': missing,
-        'completed': completed,
+        "total_expected": total_expected,
+        "total_completed": total_completed,
+        "missing": missing,
+        "completed": completed,
     }
 
 
