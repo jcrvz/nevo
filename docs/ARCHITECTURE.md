@@ -21,7 +21,7 @@ NEVO implements adaptive metaheuristic optimisation using neuromorphic computing
 
 ### 2. Neuromorphic Computing Integration
 
-**Basal Ganglia Circuit**: Winner-take-all action selection mimicking cortico-basal ganglia-thalamic loops:
+**Basal Ganglia Circuit**: Winner-Take-All (WTA) action selection mimicking Cortico-Basal Ganglia-Thalamic Loops:
 ```
 State Features → Utility Functions → Basal Ganglia → Thalamus → Selected Operator
 ```
@@ -33,21 +33,21 @@ State Features → Utility Functions → Basal Ganglia → Thalamus → Selected
 
 **Adaptive Learning**: Operator selection is governed by two complementary mechanisms:
 - **Utility-weight adaptation**: Each operator's utility weight is updated online via a reward signal (relative fitness improvement). Weights are clipped to `[0.1, 5.0]`.
-- **Temporal Difference (TD) learning**: A `TemporalDifferenceLearner` (TD(0) or TD(λ)) maintains per-operator value estimates V(a). After each timestep, a TD error δ = r + γ · max_j V(j) − V(a) is computed and V(a) is updated via the configured learning rule. The resulting TD values are mixed with the Nengo BG signal as a 20 % additive bias during action selection.
-- **Epsilon-greedy exploration**: With probability ε, a random operator is chosen regardless of utility or TD values.
+- **Temporal Difference (TD) learning**: A `TemporalDifferenceLearner` (TD(0) or TD($\lambda$)) maintains per-operator value estimates $V(a)$. After each timestep, a TD error $\lambda = r + γ \cdot \max_j V(j) − V(a)$ is computed and $V(a)$ is updated via the configured learning rule. The resulting TD values are mixed with the Nengo BG signal as a 20 % additive bias during action selection.
+- **Epsilon-greedy exploration**: With probability $\varepsilon$, a random operator is chosen regardless of utility or TD values.
 
 ### 3. State-Aware Optimisation
 
 **Feature Extraction**: Three-dimensional state representation:
-1. **Diversity** (φ_d): Average per-dimension standard deviation of valid memory vectors, normalised by 0.6 (clipped to `[0, 1]`).
-2. **Improvement Rate** (φ_i): Fraction of recent timesteps that improved the best solution over a sliding window of length 50. Returns the default 0.5 until at least 10 history entries exist.
-3. **Convergence** (φ_c): Fitness homogeneity; i.e., `1 / (1 + 10 · f_range / |f_min|)` for non-zero minima; `1 − f_range/100` otherwise.
+1. **Diversity** ($\phi_d$): Average per-dimension standard deviation of valid memory vectors, normalised by 0.6 (clipped to `[0, 1]`).
+2. **Improvement Rate** ($\phi_i$): Fraction of recent timesteps that improved the best solution over a sliding window of length 50. Returns the default 0.5 until at least 10 history entries exist.
+3. **Convergence** ($\phi_c$): Fitness homogeneity; i.e., `1 / (1 + 10 · f_range / |f_min|)` for non-zero minima; `1 − f_range/100` otherwise.
 
 **Utility Functions**: Each operator has a state-dependent utility:
-- **LevyFlight**: High when stuck (low φ_i) and not converged.
-- **DifferentialEvolution**: High when diversity exists (high φ_d). Requires ≥ 3 valid memory slots; falls back to Gaussian noise otherwise.
+- **LevyFlight**: High when stuck (low $\phi_i$) and not converged.
+- **DifferentialEvolution**: High when diversity exists (high $\phi_d$). Requires $\ge$ 3 valid memory slots; falls back to Gaussian noise otherwise.
 - **ParticleSwarm**: High when improving and converging.
-- **SpiralOptimisation**: High when highly converged (high φ_c).
+- **SpiralOptimisation**: High when highly converged (high $\phi_c$).
 
 ### 4. Memory-Based Search
 
@@ -109,7 +109,7 @@ def generate_population(
 | `"nm_dual"` | 2 neuromorphic ensembles | BG winner calls `generate_population()` exclusively (hard WTA) |
 | `"nm_softmix"` | 2 neuromorphic ensembles | Both `generate_population()` are called every timestep; per-candidate λ ~ Beta(α, β) blends results (`soft_mix_temperature=0.35`, `soft_mix_concentration=6.0`; minimum ensemble weight 0.1) |
 
-**`nm_softmix` blending detail**: The BG thalamus output is passed through a softmax with `temperature=0.35` to obtain weights `[w_explore, w_exploit]`. These parameterise a Beta distribution: α = max(0.5, w_exploit × 6.0), β = max(0.5, w_explore × 6.0). A per-candidate scalar λ is sampled from Beta(α, β), giving the exploitation blend fraction. Final candidate = (1 − λ) · explore + λ · exploit.
+**`nm_softmix` blending detail**: The BG thalamus output is passed through a softmax with `temperature=0.35` to obtain weights `[w_explore, w_exploit]`. These parameterise a Beta distribution: $\alpha = \max\{0.5, \texttt{w_exploit} \times 6.0\}$, $\beta = \max\{0.5, \texttt{w_explore} \times 6.0\}$. A per-candidate scalar λ is sampled from $\mathsf{Beta}(\alpha, \beta)$, giving the exploitation blend fraction. Final candidate is given by $ (1 − \lambda) \cdot \texttt{explore} + \lambda \cdot \texttt{exploit}$.
 
 > **Note**: In both `nm_dual` and `nm_softmix`, `select_operator()` is still invoked each timestep for reward computation and TD/utility-weight bookkeeping; in `nm_softmix` the winning operator is tracked for learning purposes even though population generation is always blended.
 
@@ -130,11 +130,11 @@ def generate_population(
   5. **ε-greedy**: select `argmax(combined)` with probability `1 − ε`; random operator otherwise.
 
 **TemporalDifferenceLearner** (`td_learning.py`):
-- Maintains per-operator value estimates V(a) and eligibility traces for TD(λ).
+- Maintains per-operator value estimates V($a$) and eligibility traces for TD($\lambda$).
 - Composed of a pluggable **LearningRule** and a pluggable **ValueModel**.
-- **Learning rules**: `SimpleTDRule` (ΔV = α·δ), `DecayingTDRule` (decaying factor per rule type), `ConservativeTDRule` (damped + clipped update), `AdaptiveTDRule` (magnitude-adaptive α).
+- **Learning rules**: `SimpleTDRule` ($\Delta V = \alpha\cdot\delta$), `DecayingTDRule` (decaying factor per rule type), `ConservativeTDRule` (damped + clipped update), `AdaptiveTDRule` (magnitude-adaptive α).
 - **Value models**: `LinearValueModel` (one scalar per operator, clipped to `[0.1, 5.0]`), `BoundedValueModel` (same with per-operator adaptive bounds).
-- `EligibilityTraceManager` handles trace decay: traces(i) ← traces(i) × γ·λ each step, then traces(selected) += 1.
+- `EligibilityTraceManager` handles trace decay: `traces(i) ← traces(i) × γ·λ` each step, then `traces(selected) += 1`.
 - All TD components can be swapped at runtime without rebuilding the Nengo model.
 
 **NEVOptimiser** (`optimiser.py`):
@@ -326,13 +326,13 @@ op_idx_trace  = stats[:, 2]   # operator index selected each timestep
 
 **Memory Size (`MU`)**:
 - Recommended: `MU = population_size / 2`.
-- `DifferentialEvolution` requires ≥ 3 valid (non-sentinel) slots; it falls back to Gaussian noise around the centroid if fewer are available.
+- `DifferentialEvolution` requires $\geq$ 3 valid (non-sentinel) slots; it falls back to Gaussian noise around the centroid if fewer are available.
 
 **Neurons Per Ensemble**:
 - Recommended: 100 for research, 50 for Loihi.
-- `StateEnsemble` is fixed at 100 neurons (3-D, radius=1.5).
-- `NeuromorphicExplorationEnsemble`: 150 LIF neurons, τ_syn = 5 ms.
-- `NeuromorphicExploitationEnsemble`: 200 LIF neurons, τ_syn = 20 ms.
+- `StateEnsemble` is fixed at 100 neurons (3D, `radius = 1.5`).
+- `NeuromorphicExplorationEnsemble`: 150 LIF neurons, $\tau_\text{syn} = 5$ ms.
+- `NeuromorphicExploitationEnsemble`: 200 LIF neurons, $τ_\text{syn} = 20$ ms.
 
 ---
 

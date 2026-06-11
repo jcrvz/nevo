@@ -1,20 +1,189 @@
-/* NEVO documentation — minor style additions on top of furo */
+/*
+ * NEVO documentation — brand identity stylesheet
+ *
+ * Color palette extracted from docs/images/nevo-logo.png
+ * ------------------------------------------------------------------
+ *  --nevo-orange       #f06010   vibrant brand primary (orange-red)
+ *  --nevo-amber        #d09030   warm amber / gold accent
+ *  --nevo-navy         #103050   deep navy secondary
+ *  --nevo-navy-dark    #102040   darkest navy (dark-mode backgrounds)
+ *  --nevo-gray         #b0b0c0   cool neutral gray
+ * ------------------------------------------------------------------
+ */
 
-/* Wider content area on large screens */
+/* ── Root design tokens ─────────────────────────────────────────── */
+:root {
+    --nevo-orange:    #f06010;
+    --nevo-amber:     #d09030;
+    --nevo-navy:      #103050;
+    --nevo-navy-dark: #102040;
+    --nevo-gray:      #b0b0c0;
+    --nevo-orange-light: #f5894a;
+    --nevo-amber-light:  #e8b860;
+}
+
+/* ── Wider content area on large screens ────────────────────────── */
 @media (min-width: 1200px) {
     .content {
-        max-width: 900px;
+        max-width: 920px;
     }
 }
 
-/* Monospace for parameter names in tables */
-.field-list dt code {
-    font-size: 0.95em;
-}
-
-/* Subtle separator below page titles */
+/* ── Page title underline (brand orange) ────────────────────────── */
 h1 {
-    border-bottom: 2px solid var(--color-brand-primary);
+    border-bottom: 3px solid var(--nevo-orange);
     padding-bottom: 0.3em;
 }
 
+/* ── Section headings: navy accent bar ──────────────────────────── */
+h2 {
+    border-left: 4px solid var(--nevo-amber);
+    padding-left: 0.5em;
+    color: var(--color-brand-content, var(--nevo-navy));
+}
+
+h3 {
+    color: var(--color-brand-content, var(--nevo-navy));
+    border-bottom: 1px dotted var(--nevo-gray);
+    padding-bottom: 0.15em;
+}
+
+/* ── Sidebar logo and title alignment ─────────────────────────── */
+.sidebar-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.sidebar-logo {
+    max-width: 140px;
+    margin: 0 auto 0.75rem auto;
+    display: block;
+}
+
+/* ── Sidebar title (project name) ───────────────────────────────── */
+.sidebar-brand-text {
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-align: center;
+}
+
+/* ── Navigation links: hover accent ─────────────────────────────── */
+.sidebar-tree .reference:hover {
+    color: var(--nevo-orange) !important;
+}
+
+/* ── Active nav item indicator ──────────────────────────────────── */
+.sidebar-tree .current > .reference {
+    border-left: 3px solid var(--nevo-orange);
+    padding-left: 0.4em;
+    font-weight: 600;
+}
+
+/* ── Monospace for parameter names in tables ────────────────────── */
+.field-list dt code {
+    font-size: 0.92em;
+    background: var(--color-inline-code-background, #f3ede6);
+    padding: 0.05em 0.3em;
+    border-radius: 3px;
+}
+
+/* ── Inline code: warm tint ─────────────────────────────────────── */
+code.literal,
+code.docutils.literal {
+    color: var(--nevo-navy);
+    border: 1px solid color-mix(in srgb, var(--nevo-amber) 30%, transparent);
+}
+
+/* ── Code blocks: left accent bar ───────────────────────────────── */
+div[class^="highlight"] {
+    border-left: 3px solid var(--nevo-orange);
+    border-radius: 0 4px 4px 0;
+}
+
+/* ── Admonition (note / tip) custom headers ─────────────────────── */
+.admonition.note > .admonition-title {
+    background-color: color-mix(in srgb, var(--nevo-navy) 12%, transparent);
+    border-left: 4px solid var(--nevo-navy);
+}
+
+.admonition.tip > .admonition-title,
+.admonition.hint > .admonition-title {
+    background-color: color-mix(in srgb, var(--nevo-amber) 15%, transparent);
+    border-left: 4px solid var(--nevo-amber);
+}
+
+.admonition.warning > .admonition-title,
+.admonition.important > .admonition-title {
+    border-left: 4px solid var(--nevo-orange);
+}
+
+/* ── Table header: navy background ──────────────────────────────── */
+table.docutils thead th {
+    background-color: var(--nevo-navy);
+    color: #fff;
+    font-weight: 600;
+}
+
+table.docutils tbody tr:nth-child(even) {
+    background-color: color-mix(in srgb, var(--nevo-amber) 6%, transparent);
+}
+
+/* ── Hyperlinks ─────────────────────────────────────────────────── */
+a {
+    color: var(--color-brand-primary, var(--nevo-orange));
+}
+
+a:hover {
+    color: var(--nevo-amber);
+    text-decoration: underline;
+}
+
+/* ── "Edit on GitHub" / source link ─────────────────────────────── */
+.header-article-actions .icon {
+    color: var(--nevo-orange);
+}
+
+/* ── API doc: method/attribute labels ───────────────────────────── */
+.sig-name {
+    color: var(--nevo-navy);
+    font-weight: 700;
+}
+
+.sig-param em {
+    color: var(--nevo-amber);
+}
+
+/* ── Dark mode overrides ─────────────────────────────────────────── */
+[data-theme="dark"] h2 {
+    border-left-color: var(--nevo-amber-light);
+    color: var(--nevo-amber-light);
+}
+
+[data-theme="dark"] h3 {
+    color: #c8d8e8;
+    border-bottom-color: #2a4060;
+}
+
+[data-theme="dark"] code.literal,
+[data-theme="dark"] code.docutils.literal {
+    color: var(--nevo-amber-light);
+}
+
+[data-theme="dark"] div[class^="highlight"] {
+    border-left-color: var(--nevo-orange-light);
+}
+
+[data-theme="dark"] table.docutils thead th {
+    background-color: #1a3050;
+    color: #e8c87a;
+}
+
+[data-theme="dark"] .sig-name {
+    color: #8a9eb3; /* A less saturated, darker blue-gray for better readability */
+}
+
+[data-theme="dark"] .sig-param em {
+    color: var(--nevo-amber-light);
+}

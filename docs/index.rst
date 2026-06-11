@@ -1,16 +1,16 @@
 Neuromorphic EVolutionary Optimisation (NEVO)
 ==============================================
 
-**NEVO** uses a Nengo-simulated basal ganglia circuit to adaptively select
+**NEVO** uses a Nengo-simulated Basal Ganglia (BG) circuit to adaptively select
 optimisation operators at runtime. The search loop is as follows:
 
-   extract 3-D state features → compute operator utilities →
-   BG winner-take-all selection → generate population →
-   evaluate → update memory & TD weights
+   Extract state features → Compute operator utilities →
+   BG selection → Generate population →
+   Evaluate → Update memory & TD weights
 
 As a general overview, the loop is represented in the following diagram:
 
-.. image:: /images/general_loop_abstract.svg
+.. image:: /images/cbtl-simple.png
    :align: center
    :alt: Loop diagram
 

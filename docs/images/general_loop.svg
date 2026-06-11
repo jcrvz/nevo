@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 330" width="720" height="330">
+  <defs>
+    <marker id="arr" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,1 L0,9 L9,5 z" fill="#455a64"/>
+    </marker>
+    <filter id="sh" x="-8%" y="-8%" width="116%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000028"/>
+    </filter>
+  </defs>
+  <!-- Background -->
+  <rect width="720" height="330" fill="#f4f6f9" rx="14"/>
+  <!-- Title -->
+  <text x="360" y="38" text-anchor="middle" fill="#1a237e"
+        font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="bold"
+        letter-spacing="0.4">NEVO Optimisation Loop</text>
+  <!-- ══ TOP ROW (left → right) ════════════════════════════ -->
+  <!-- ① State Features -->
+  <rect x="30" y="62" width="170" height="76" rx="10" fill="#0d47a1" filter="url(#sh)"/>
+  <circle cx="48" cy="78" r="11" fill="white" fill-opacity="0.20"/>
+  <text x="48" y="82" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="bold">1</text>
+  <text x="115" y="88" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="12" font-weight="bold">State Features</text>
+  <text x="115" y="105" text-anchor="middle" fill="#bbdefb"
+        font-family="Arial,Helvetica,sans-serif" font-size="10">(diversity) + (impr.) + (conv.)</text>
+  <text x="115" y="121" text-anchor="middle" fill="#90caf9"
+        font-family="Arial,Helvetica,sans-serif" font-size="9">StateFeatures.compute()</text>
+  <!-- Arrow ①→② -->
+  <line x1="202" y1="100" x2="273" y2="100"
+        stroke="#455a64" stroke-width="2.5" marker-end="url(#arr)"/>
+  <!-- ② Operator Utilities -->
+  <rect x="275" y="62" width="170" height="76" rx="10" fill="#0d47a1" filter="url(#sh)"/>
+  <circle cx="293" cy="78" r="11" fill="white" fill-opacity="0.20"/>
+  <text x="293" y="82" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="bold">2</text>
+  <text x="360" y="88" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="12" font-weight="bold">Operator Utilities</text>
+  <text x="360" y="105" text-anchor="middle" fill="#bbdefb"
+        font-family="Arial,Helvetica,sans-serif" font-size="10">utility_fn(features) • weight</text>
+  <text x="360" y="121" text-anchor="middle" fill="#90caf9"
+        font-family="Arial,Helvetica,sans-serif" font-size="9">UtilityFunction.compute()</text>
+  <!-- Arrow ②→③ -->
+  <line x1="447" y1="100" x2="518" y2="100"
+        stroke="#455a64" stroke-width="2.5" marker-end="url(#arr)"/>
+  <!-- ③ Basal Ganglia WTA (purple = neuromorphic) -->
+  <rect x="520" y="62" width="170" height="76" rx="10" fill="#4a148c" filter="url(#sh)"/>
+  <circle cx="538" cy="78" r="11" fill="white" fill-opacity="0.20"/>
+  <text x="538" y="82" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="bold">3</text>
+  <text x="605" y="88" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="12" font-weight="bold">Basal Ganglia WTA</text>
+  <text x="605" y="105" text-anchor="middle" fill="#e1bee7"
+        font-family="Arial,Helvetica,sans-serif" font-size="10">winner-take-all + ε-greedy</text>
+  <text x="605" y="121" text-anchor="middle" fill="#ce93d8"
+        font-family="Arial,Helvetica,sans-serif" font-size="9">Nengo BG · Thalamus · TD</text>
+  <!-- Arrow ③↓④ -->
+  <line x1="605" y1="140" x2="605" y2="212"
+        stroke="#455a64" stroke-width="2.5" marker-end="url(#arr)"/>
+  <!-- ══ BOTTOM ROW (right → left) ════════════════════════ -->
+  <!-- ④ Generate Population -->
+  <rect x="520" y="214" width="170" height="76" rx="10" fill="#0d47a1" filter="url(#sh)"/>
+  <circle cx="538" cy="230" r="11" fill="white" fill-opacity="0.20"/>
+  <text x="538" y="234" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="bold">4</text>
+  <text x="605" y="240" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="12" font-weight="bold">Generate Population</text>
+  <text x="605" y="257" text-anchor="middle" fill="#bbdefb"
+        font-family="Arial,Helvetica,sans-serif" font-size="10">operator.generate_population()</text>
+  <text x="605" y="273" text-anchor="middle" fill="#90caf9"
+        font-family="Arial,Helvetica,sans-serif" font-size="9">v-space [−1, 1]ᴰ</text>
+  <!-- Arrow ④←⑤ -->
+  <line x1="518" y1="252" x2="447" y2="252"
+        stroke="#455a64" stroke-width="2.5" marker-end="url(#arr)"/>
+  <!-- ⑤ Evaluate (green) -->
+  <rect x="275" y="214" width="170" height="76" rx="10" fill="#1b5e20" filter="url(#sh)"/>
+  <circle cx="293" cy="230" r="11" fill="white" fill-opacity="0.20"/>
+  <text x="293" y="234" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="bold">5</text>
+  <text x="360" y="240" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="12" font-weight="bold">Evaluate f(x)</text>
+  <text x="360" y="257" text-anchor="middle" fill="#c8e6c9"
+        font-family="Arial,Helvetica,sans-serif" font-size="10">trs2o(v, lb, ub) → x</text>
+  <text x="360" y="273" text-anchor="middle" fill="#a5d6a7"
+        font-family="Arial,Helvetica,sans-serif" font-size="9">objective_function(x)</text>
+  <!-- Arrow ⑤←⑥ -->
+  <line x1="273" y1="252" x2="202" y2="252"
+        stroke="#455a64" stroke-width="2.5" marker-end="url(#arr)"/>
+  <!-- ⑥ Update Memory & TD (orange = learning) -->
+  <rect x="30" y="214" width="170" height="76" rx="10" fill="#bf360c" filter="url(#sh)"/>
+  <circle cx="48" cy="230" r="11" fill="white" fill-opacity="0.20"/>
+  <text x="48" y="234" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="bold">6</text>
+  <text x="115" y="240" text-anchor="middle" fill="white"
+        font-family="Arial,Helvetica,sans-serif" font-size="12" font-weight="bold">Update Memory</text>
+  <text x="115" y="257" text-anchor="middle" fill="#ffe0b2"
+        font-family="Arial,Helvetica,sans-serif" font-size="10">&amp; TD Weights</text>
+  <text x="115" y="273" text-anchor="middle" fill="#ffcc80"
+        font-family="Arial,Helvetica,sans-serif" font-size="9">update_memory() · TD.update()</text>
+  <!-- Arrow ⑥↑① -->
+  <line x1="115" y1="212" x2="115" y2="140"
+        stroke="#455a64" stroke-width="2.5" marker-end="url(#arr)"/>
+  <!-- Legend -->
+  <rect x="30"  y="305" width="12" height="12" rx="2" fill="#0d47a1"/>
+  <text x="47"  y="315" fill="#546e7a" font-family="Arial,Helvetica,sans-serif" font-size="9">Computation</text>
+  <rect x="130" y="305" width="12" height="12" rx="2" fill="#4a148c"/>
+  <text x="147" y="315" fill="#546e7a" font-family="Arial,Helvetica,sans-serif" font-size="9">Neuromorphic (Nengo)</text>
+  <rect x="290" y="305" width="12" height="12" rx="2" fill="#1b5e20"/>
+  <text x="307" y="315" fill="#546e7a" font-family="Arial,Helvetica,sans-serif" font-size="9">Objective evaluation</text>
+  <rect x="450" y="305" width="12" height="12" rx="2" fill="#bf360c"/>
+  <text x="467" y="315" fill="#546e7a" font-family="Arial,Helvetica,sans-serif" font-size="9">Memory &amp; TD learning</text>
+</svg>

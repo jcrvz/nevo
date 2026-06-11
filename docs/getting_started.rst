@@ -4,15 +4,16 @@ Getting Started
 Installation
 ------------
 
-Using pip::
-
-   pip install nevo
-
 From source::
 
    git clone https://github.com/jcrvz/nevo.git
    cd nevo
    pip install -e .
+
+
+Using pip (not available on PyPI yet, but will be soon)::
+
+   pip install nevo
 
 Using uv (recommended)::
 
