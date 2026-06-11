@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath(".."))
 project = "NEVO"
 copyright = "2026, Jorge Mario Cruz-Duarte & El-Ghazali Talbi"
 author = "Jorge Mario Cruz-Duarte & El-Ghazali Talbi"
-release = "0.1.0"
+release = "0.1.1"
 version = "0.1"
 
 # ---------------------------------------------------------------------------
@@ -119,8 +119,8 @@ pygments_dark_style = "monokai"
 # ---------------------------------------------------------------------------
 _brand_primary   = "#f06010"   # orange-red
 _brand_amber     = "#d09030"   # amber/gold
-_brand_navy      = "#102040"   # deep navy
-_brand_navy_dark = "#102040"   # darkest navy
+_brand_navy      = "#103050"   # deep navy secondary
+_brand_navy_dark = "#102040"   # darkest navy (dark-mode backgrounds)
 _brand_gray      = "#b0b0c0"   # cool gray
 
 html_theme_options = {

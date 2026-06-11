@@ -9,7 +9,7 @@ NEVO implements adaptive metaheuristic optimisation using neuromorphic computing
 ### 1. Modularity
 
 **Operator Independence**: Each optimisation operator is a self-contained module that:
-- Inherits from the `Operator` base class.
+- Inherits from `ExplorationOperator` or `ExploitationOperator` (both subclasses of the `Operator` ABC).
 - Implements `generate_population()`.
 - Maintains its own statistics.
 - Can be added or removed without modifying core code.
@@ -33,7 +33,7 @@ State Features → Utility Functions → Basal Ganglia → Thalamus → Selected
 
 **Adaptive Learning**: Operator selection is governed by two complementary mechanisms:
 - **Utility-weight adaptation**: Each operator's utility weight is updated online via a reward signal (relative fitness improvement). Weights are clipped to `[0.1, 5.0]`.
-- **Temporal Difference (TD) learning**: A `TemporalDifferenceLearner` (TD(0) or TD($\lambda$)) maintains per-operator value estimates $V(a)$. After each timestep, a TD error $\lambda = r + γ \cdot \max_j V(j) − V(a)$ is computed and $V(a)$ is updated via the configured learning rule. The resulting TD values are mixed with the Nengo BG signal as a 20 % additive bias during action selection.
+- **Temporal Difference (TD) learning**: A `TemporalDifferenceLearner` (TD(0) or TD($\lambda$)) maintains per-operator value estimates $V(a)$. After each timestep, a TD error $\delta = r + \gamma \cdot \max_j V(j) - V(a)$ is computed and $V(a)$ is updated via the configured learning rule. The resulting TD values are mixed with the Nengo BG signal as a 20 % additive bias during action selection.
 - **Epsilon-greedy exploration**: With probability $\varepsilon$, a random operator is chosen regardless of utility or TD values.
 
 ### 3. State-Aware Optimisation
@@ -318,7 +318,7 @@ op_idx_trace  = stats[:, 2]   # operator index selected each timestep
 
 **Timestep (`dt`)**:
 - Smaller `dt` means more evaluations but slower wall-clock time.
-- Recommended: `0.001` s (1000 evals/second with `population_size=1`).
+- Recommended: `0.001` s — with `population_size=N`, each simulated second performs `1000 × N` objective evaluations.
 
 **Population Size**:
 - Controls candidates per timestep, not total budget.
