@@ -1,6 +1,14 @@
 # NEVO: Neuromorphic Evolutionary Optimisation
 
+[![Tests](https://github.com/jcrvz/nevo/actions/workflows/tests.yml/badge.svg)](https://github.com/jcrvz/nevo/actions/workflows/tests.yml)
+[![Docs](https://github.com/jcrvz/nevo/actions/workflows/docs.yml/badge.svg)](https://jcrvz.github.io/nevo)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License: BSD-3](https://img.shields.io/badge/License-BSD%203--Clause-orange.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-0.1.1-brightgreen.svg)](CHANGELOG.md)
+
 **NEVO** (Neuromorphic EVolutionary Optimisation) is a Python framework that bridges evolutionary computation and neuromorphic computing. It uses spiking neural networks to adaptively select and coordinate optimisation operators in real time.
+
+📖 **Full documentation**: [jcrvz.github.io/nevo](https://jcrvz.github.io/nevo)
 
 ## Key Features
 
@@ -180,7 +188,7 @@ BSD 3-Clause License; see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-Contributions are welcome. Please submit a pull request.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and open a pull request. All contributions must pass the test suite (`pytest tests/`).
 
 ## Related Projects
 

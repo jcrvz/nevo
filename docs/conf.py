@@ -27,6 +27,7 @@ extensions = [
     "sphinx.ext.intersphinx",       # cross-reference external projects
     "sphinx.ext.mathjax",           # render LaTeX math
     "sphinx_autodoc_typehints",     # render type annotations cleanly
+    "sphinx_copybutton",            # copy-to-clipboard button on code blocks
     "myst_parser",                  # parse existing Markdown guides
 ]
 
@@ -104,7 +105,8 @@ html_css_files = ["custom.css"]
 html_title = "NEVO"
 html_logo = "_static/nevo-logo.png"
 html_favicon = "_static/favicon.ico"
-#html_show_sphinx = False
+html_show_sphinx = False
+html_baseurl = "https://jcrvz.github.io/nevo/"   # canonical URL for GitHub Pages SEO
 pygments_style = "friendly"
 pygments_dark_style = "monokai"
 
