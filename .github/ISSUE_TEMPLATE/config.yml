@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://jcrvz.github.io/nevo
+    about: Read the full NEVO documentation.
+  - name: Discussions
+    url: https://github.com/jcrvz/nevo/discussions
+    about: Ask questions and share ideas in GitHub Discussions.
+

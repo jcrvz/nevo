@@ -1,0 +1,57 @@
+name: Feature Request
+description: Suggest a new operator, mode, or framework capability
+labels: ["enhancement"]
+assignees: ["jcrvz"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an improvement to NEVO!
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem does this feature solve? What use case does it enable?
+      placeholder: "I need to run NEVO on problems with D > 500 but the current operators are too slow because..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or change you'd like. Code sketches are welcome.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you tried any workarounds or alternatives?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New operator
+        - Operator mode (trad / nm_dual / nm_softmix)
+        - TD learning
+        - Basal ganglia / utility functions
+        - Benchmarking / IOH / COCO
+        - Visualisation
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Links to papers, related issues, or anything else that's relevant.
+
