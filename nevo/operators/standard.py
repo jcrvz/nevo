@@ -9,7 +9,7 @@ neuromorphic optimisation.
 import numpy as np
 import nengo
 import math
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from nevo.operators.base import ExplorationOperator, ExploitationOperator
 
 
@@ -507,12 +507,10 @@ class GravitationalSearch(ExplorationOperator):
             # Start from centre with small noise
             pos = centre + np.random.randn(dim) * 0.05
 
-            # Compute gravitational force
-            force = np.zeros(dim)
-            for j, (other, mass) in enumerate(zip(valid_vectors, masses)):
-                diff = other - pos
-                dist = np.linalg.norm(diff) + 1e-12
-                force += G * mass * diff / dist
+            # Vectorised gravitational force: (n_valid, dim) broadcast
+            diffs = valid_vectors - pos[np.newaxis, :]          # (n_valid, dim)
+            dists = np.linalg.norm(diffs, axis=1, keepdims=True) + 1e-12  # (n_valid, 1)
+            force = G * np.sum(masses[:, np.newaxis] * diffs / dists, axis=0)  # (dim,)
 
             # Apply force with random component
             acceleration = force * np.random.rand()
@@ -1249,3 +1247,246 @@ class NeuromorphicExploitationEnsemble(ExploitationOperator):
             candidates.append(np.clip(candidate, -1.0, 1.0))
 
         return np.array(candidates)
+
+
+# ============================================================================
+# Large-Scale Operators
+# ============================================================================
+
+
+class CoordinateDescent(ExploitationOperator):
+    """
+    Coordinate Descent Operator
+
+    Perturbs a randomly chosen sparse subset of dimensions per candidate,
+    keeping all other coordinates fixed at the global best value.
+
+    Particularly effective for separable and block-separable high-dimensional
+    functions where variable interactions are limited.
+
+    Best used when: D > 50, function is separable or near-separable.
+
+    The update rule is:
+
+    .. math::
+
+        x_k^{\\text{new}} = x_k^{\\text{best}} + \\sigma \\epsilon_k,
+        \\quad k \\in \\mathcal{K}
+
+    where :math:`\\mathcal{K}` is a random subset of :math:`k` coordinates,
+    :math:`\\sigma` is the step size, and :math:`\\epsilon_k \\sim \\mathcal{N}(0,1)`.
+    """
+
+    def __init__(self, k_frac: Optional[float] = None, scale: float = 0.1):
+        """
+        Parameters
+        ----------
+        k_frac : float or None
+            Fraction of dimensions to perturb per candidate. None uses
+            ``1 / sqrt(D)``, capped at 0.5. Range: (0, 1].
+        scale : float
+            Perturbation magnitude (0.05-0.3 recommended).
+        """
+        super().__init__("CoordinateDescent", short_name="CD", complexity=2)
+        self.k_frac = k_frac
+        self.scale = scale
+
+    def generate_population(
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
+    ) -> np.ndarray:
+        """Generate candidates by perturbing a sparse subset of coordinates."""
+        dim = len(centre)
+        global_best = state.get("best_v")
+        if global_best is None:
+            global_best = centre
+
+        # Adaptive coordinate fraction: default 1/sqrt(D), capped at 0.5
+        k_frac = (
+            self.k_frac
+            if self.k_frac is not None
+            else min(0.5, 1.0 / max(1.0, dim ** 0.5))
+        )
+        k = max(1, int(round(k_frac * dim)))
+
+        candidates = []
+        for _ in range(population_size):
+            candidate = global_best.copy()
+            dims_to_perturb = np.random.choice(dim, k, replace=False)
+            candidate[dims_to_perturb] += np.random.randn(k) * self.scale
+            candidates.append(np.clip(candidate, -1.0, 1.0))
+
+        return np.array(candidates)
+
+
+class RandomEmbedding(ExplorationOperator):
+    """
+    Random Embedding Operator
+
+    Embeds the search in a low-dimensional subspace using a random orthogonal
+    projection. Exploits the observation that many real-world high-dimensional
+    problems have low effective dimensionality.
+
+    Based on the REMEDA principle: a random linear embedding of dimension
+    :math:`d_{\\text{eff}} \\ll D` preserves near-optimal solutions when the
+    intrinsic dimension of the problem is low.
+
+    Best used when: D > 100, problem has low intrinsic dimensionality.
+
+    The update rule is:
+
+    .. math::
+
+        x_{\\text{new}} = x_c + A z, \\quad z \\sim \\mathcal{N}(0, \\sigma^2 I_{d})
+
+    where :math:`A \\in \\mathbb{R}^{D \\times d}` is a random orthonormal matrix
+    and :math:`d = d_{\\text{eff}}` is the effective dimensionality.
+    """
+
+    def __init__(
+        self,
+        effective_dim: int = 10,
+        scale: float = 0.3,
+        refresh_every: int = 100,
+    ):
+        """
+        Parameters
+        ----------
+        effective_dim : int
+            Low-dimensional subspace size (5–20 recommended for high-D problems).
+        scale : float
+            Step size in the embedded subspace (0.1-0.5 recommended).
+        refresh_every : int
+            Re-draw the random projection after this many ``generate_population``
+            calls, so the search periodically explores different subspaces.
+        """
+        super().__init__("RandomEmbedding", short_name="RE", complexity=5)
+        self.effective_dim = effective_dim
+        self.scale = scale
+        self.refresh_every = refresh_every
+        self._projection: Optional[np.ndarray] = None
+        self._projection_dim: Optional[int] = None
+        self._call_count: int = 0
+
+    def _get_projection(self, dim: int) -> np.ndarray:
+        """Return (or rebuild) a ``(D, eff_d)`` orthonormal projection matrix."""
+        eff_d = min(self.effective_dim, dim)
+        needs_refresh = (
+            self._projection is None
+            or self._projection_dim != dim
+            or (self._call_count % self.refresh_every == 0)
+        )
+        if needs_refresh:
+            A = np.random.randn(dim, eff_d)
+            if eff_d < dim:
+                A, _ = np.linalg.qr(A)
+                A = A[:, :eff_d]
+            self._projection = A
+            self._projection_dim = dim
+        return self._projection
+
+    def generate_population(
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
+    ) -> np.ndarray:
+        """Generate candidates via random projection into a low-D subspace."""
+        dim = len(centre)
+        self._call_count += 1
+        A = self._get_projection(dim)  # (D, eff_d)
+        eff_d = A.shape[1]
+
+        # Sample in low-D subspace and project back to D dimensions
+        Z = np.random.randn(population_size, eff_d) * self.scale  # (pop, eff_d)
+        perturbations = Z @ A.T                                     # (pop, D)
+        candidates = centre[np.newaxis, :] + perturbations
+
+        return np.clip(candidates, -1.0, 1.0)
+
+
+class CovarianceAdaptation(ExploitationOperator):
+    """
+    Covariance Adaptation Operator (simplified CMA-ES style)
+
+    Estimates the covariance of the elite memory solutions and samples new
+    candidates from the induced Gaussian distribution. Automatically adapts
+    the step distribution to the local problem geometry.
+
+    For ``D ≤ max_full_cov_dim`` a full covariance matrix is used (accurate but
+    O(D²) memory). For ``D > max_full_cov_dim`` only the diagonal variance is
+    estimated (linear memory, still captures per-dimension scaling).
+
+    Best used when: memory is well populated, problem has non-separable structure.
+
+    The update rule is:
+
+    .. math::
+
+        x_{\\text{new}} \\sim \\mathcal{N}(\\mu_{\\text{elite}},\\,
+        \\sigma^2 C_{\\text{elite}})
+
+    where :math:`\\mu_{\\text{elite}}` and :math:`C_{\\text{elite}}` are the mean
+    and (optionally diagonal) covariance of the top-``elite_frac`` memory solutions.
+    """
+
+    def __init__(
+        self,
+        elite_frac: float = 0.3,
+        scale: float = 0.5,
+        max_full_cov_dim: int = 50,
+    ):
+        """
+        Parameters
+        ----------
+        elite_frac : float
+            Fraction of valid memory used as elite set (0.2–0.5 recommended).
+        scale : float
+            Global scaling factor for the covariance (0.2–1.0 recommended).
+        max_full_cov_dim : int
+            Dimensions above this threshold use diagonal-only covariance.
+        """
+        super().__init__("CovarianceAdaptation", short_name="CA", complexity=8)
+        self.elite_frac = elite_frac
+        self.scale = scale
+        self.max_full_cov_dim = max_full_cov_dim
+
+    def generate_population(
+        self, centre: np.ndarray, state: Dict[str, Any], population_size: int
+    ) -> np.ndarray:
+        """Generate candidates by sampling from the elite covariance distribution."""
+        dim = len(centre)
+        memory_fitness = state.get("memory_fitness", np.array([]))
+        memory_vectors = state.get("memory_vectors", np.array([]))
+        f_default_worst = state.get("f_default_worst", 1e10)
+
+        valid_mask = memory_fitness < f_default_worst
+        valid_vectors = memory_vectors[valid_mask]
+        valid_fitness = memory_fitness[valid_mask]
+
+        if len(valid_vectors) < 2:
+            # Insufficient memory: fall back to scaled random around centre
+            return np.clip(
+                centre[np.newaxis, :] + np.random.randn(population_size, dim) * self.scale,
+                -1.0,
+                1.0,
+            )
+
+        # Select elite solutions (rank by fitness, take best fraction)
+        n_elite = max(2, int(round(self.elite_frac * len(valid_vectors))))
+        elite_idx = np.argsort(valid_fitness)[:n_elite]
+        elite = valid_vectors[elite_idx]  # (n_elite, dim)
+        mean = np.mean(elite, axis=0)
+
+        if dim <= self.max_full_cov_dim and n_elite >= dim + 1:
+            # Full covariance matrix (accurate, but O(D²) — only for moderate D)
+            cov = np.cov(elite.T) * (self.scale ** 2) + np.eye(dim) * 1e-6
+            try:
+                candidates = np.random.multivariate_normal(mean, cov, size=population_size)
+            except np.linalg.LinAlgError:
+                std = np.sqrt(np.maximum(np.diag(cov), 1e-6))
+                candidates = mean[np.newaxis, :] + np.random.randn(population_size, dim) * std
+        else:
+            # Diagonal approximation: scalable to very large D
+            variance = np.var(elite, axis=0) * (self.scale ** 2) + 1e-6
+            std = np.sqrt(variance)
+            candidates = mean[np.newaxis, :] + np.random.randn(population_size, dim) * std[np.newaxis, :]
+
+        return np.clip(candidates, -1.0, 1.0)
+

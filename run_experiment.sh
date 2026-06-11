@@ -56,7 +56,7 @@ python ./check_progress.py \
     --output-dir $OUTPUT_DIR
 
 echo "Starting the benchmark experiment..."
-python ./nevo/examples/benchmark_experiment.py \
+python ./examples/benchmark_experiment.py \
     --suite cocoex \
     --problems $PROBLEMS \
     --instances $INSTANCES \
