@@ -3,6 +3,32 @@ Benchmark Experiment Runner
 ===========================
 
 Run NEVO on multiple benchmark problems using either IOH or COCO/cocoex suites.
+
+Supported COCO/cocoex suites (pass with ``--coco-suite``):
+
++----------------------+----------+------------------------------------------+
+| Suite name           | # funcs  | Valid dimensions                         |
++======================+==========+==========================================+
+| bbob (default)       | 24       | 2, 3, 5, 10, 20, 40                      |
++----------------------+----------+------------------------------------------+
+| bbob-noisy           | 30       | 2, 3, 5, 10, 20, 40                      |
++----------------------+----------+------------------------------------------+
+| bbob-biobj           | 55       | 2, 3, 5, 10, 20, 40  (multi-objective)   |
++----------------------+----------+------------------------------------------+
+| bbob-biobj-ext       | 92       | 2, 3, 5, 10, 20, 40  (multi-objective)   |
++----------------------+----------+------------------------------------------+
+| bbob-largescale      | 24       | 20, 40, 80, 160, 320, 640                |
++----------------------+----------+------------------------------------------+
+| bbob-mixint          | 24       | 5, 10, 20, 40, 80, 160 (mixed-integer)   |
++----------------------+----------+------------------------------------------+
+| bbob-constrained     | 48       | 2, 3, 5, 10, 20, 40                      |
++----------------------+----------+------------------------------------------+
+| sbox-cost            | 24       | 2, 3, 5, 10, 20, 40                      |
++----------------------+----------+------------------------------------------+
+
+.. note::
+   Multi-objective suites (bbob-biobj, bbob-biobj-ext) return vector fitness values.
+   NEVO treats the *first* objective as the scalar to minimise.
 """
 
 import numpy as np
@@ -13,6 +39,33 @@ from typing import Literal, Tuple, Any
 
 from nevo import NEVOptimiser
 from nevo.utils import plot_optimisation_results
+
+# All COCO/cocoex suite names supported by this runner
+COCO_SUITES = [
+    "bbob",
+    "bbob-noisy",
+    "bbob-biobj",
+    "bbob-biobj-ext",
+    "bbob-largescale",
+    "bbob-mixint",
+    "bbob-constrained",
+    "sbox-cost",
+]
+
+# Recommended valid dimensions per COCO suite
+COCO_SUITE_DIMS = {
+    "bbob":             [2, 3, 5, 10, 20, 40],
+    "bbob-noisy":       [2, 3, 5, 10, 20, 40],
+    "bbob-biobj":       [2, 3, 5, 10, 20, 40],
+    "bbob-biobj-ext":   [2, 3, 5, 10, 20, 40],
+    "bbob-largescale":  [20, 40, 80, 160, 320, 640],
+    "bbob-mixint":      [5, 10, 20, 40, 80, 160],
+    "bbob-constrained": [2, 3, 5, 10, 20, 40],
+    "sbox-cost":        [2, 3, 5, 10, 20, 40],
+}
+
+# Multi-objective suites — NEVO uses first objective only
+COCO_MULTIOBJECTIVE_SUITES = {"bbob-biobj", "bbob-biobj-ext"}
 
 
 class BenchmarkProblem:
@@ -27,6 +80,7 @@ class BenchmarkProblem:
         dimension: int,
         suite: Literal["ioh", "cocoex"] = "ioh",
         observer: Any = None,
+        coco_suite_name: str = "bbob",
     ):
         """
         Initialise a benchmark problem.
@@ -43,11 +97,16 @@ class BenchmarkProblem:
             Benchmark suite to use: "ioh" or "cocoex"
         observer : cocoex.Observer, optional
             COCO observer for logging results (only used with cocoex suite)
+        coco_suite_name : str
+            Which COCO suite to use when ``suite="cocoex"``
+            (e.g. "bbob", "bbob-noisy", "bbob-largescale", …).
+            Defaults to "bbob".
         """
         self.problem_id = problem_id
         self.instance = instance
         self.dimension = dimension
         self.suite = suite
+        self.coco_suite_name = coco_suite_name
         self._problem = None
         self._optimum = None
         self._bounds = None
@@ -84,9 +143,11 @@ class BenchmarkProblem:
         """Load problem from COCO/cocoex suite."""
         import cocoex
 
-        # Create the bbob suite with the specified dimension
+        suite_name = self.coco_suite_name
+
+        # Create the suite with the specified dimension and instance
         self._suite = cocoex.Suite(
-            "bbob",
+            suite_name,
             f"instances: {self.instance}",
             f"function_indices: {self.problem_id} dimensions: {self.dimension}",
         )
@@ -102,21 +163,29 @@ class BenchmarkProblem:
         if self._problem is None:
             raise ValueError(
                 f"Could not find COCO problem f{self.problem_id} "
-                f"instance {self.instance} dimension {self.dimension}"
+                f"instance {self.instance} dimension {self.dimension} "
+                f"in suite '{suite_name}'"
             )
 
-        # COCO bounds are typically [-5, 5] for bbob
         lb = np.array(self._problem.lower_bounds)
         ub = np.array(self._problem.upper_bounds)
         self._bounds = (lb, ub)
 
-        # COCO does not expose the optimal value directly
-        # It will be determined during postprocessing with cocopp
+        # COCO does not expose the optimal value directly for postprocessing suites
         self._optimum = None
 
     def __call__(self, x: np.ndarray) -> float:
-        """Evaluate the objective function."""
-        return self._problem(x)
+        """Evaluate the objective function.
+
+        For multi-objective COCO suites (bbob-biobj, bbob-biobj-ext) the
+        returned vector is scalarised by taking the *first* objective so that
+        NEVO's single-objective optimiser can still be applied.
+        """
+        result = self._problem(x)
+        # Multi-objective: scalarise to first objective
+        if hasattr(result, "__len__"):
+            return float(result[0])
+        return result
 
     def reset(self):
         """Reset the problem (if supported)."""
@@ -176,6 +245,7 @@ def _run_coco_batch(args_tuple):
         total_batches,
         batch_number,
         use_dl,
+        coco_suite_name,
     ) = args_tuple
 
     import cocoex
@@ -194,7 +264,7 @@ def _run_coco_batch(args_tuple):
         else algorithm_name
     )
     observer = cocoex.Observer(
-        "bbob",
+        coco_suite_name,
         f"result_folder: {batch_folder} "
         f"algorithm_name: {algorithm_name} "
         f'algorithm_info: "NEVO neuromorphic optimiser"',
@@ -212,7 +282,7 @@ def _run_coco_batch(args_tuple):
     for run in range(n_runs):
         # Create a fresh suite for each run
         suite = cocoex.Suite(
-            "bbob",
+            coco_suite_name,
             f"instances: {instances_str}",
             f"function_indices: {problems_str} dimensions: {dimensions_str}",
         )
@@ -255,17 +325,24 @@ def _run_coco_batch(args_tuple):
             lb = np.array(problem.lower_bounds)
             ub = np.array(problem.upper_bounds)
 
+            # Wrap in BenchmarkProblem to get multi-obj scalarisation if needed
+            def _eval(x, _p=problem):
+                result = _p(x)
+                if hasattr(result, "__len__"):
+                    return float(result[0])
+                return result
+
             # Create optimiser
             optimiser = NEVOptimiser(
-                objective_function=problem,
+                objective_function=_eval,
                 bounds=(lb, ub),
                 dimension=dimension,
-                population_size=50,  # Increased from 50 for better exploration
-                memory_size=25,  # Increased from 25 for better diversity
-                neurons_per_ensemble=50,  # Increased from 50 for better action selection
+                population_size=50,
+                memory_size=25,
+                neurons_per_ensemble=50,
                 dt=0.001,
-                epsilon=0.15,  # Slightly more exploration (was 0.1)
-                learning_rate=0.3,  # Slightly lower for stability (was 0.4)
+                epsilon=0.15,
+                learning_rate=0.3,
                 seed=seed,
             )
 
@@ -280,7 +357,7 @@ def _run_coco_batch(args_tuple):
 
             # Store results
             result = {
-                "suite": "cocoex",
+                "suite": coco_suite_name,
                 "problem_id": problem_id,
                 "problem_name": problem.name,
                 "instance": instance,
@@ -416,6 +493,7 @@ def run_coco_benchmark(
     output_dir: Path = None,
     n_cores: int = 1,
     use_dl: bool = False,
+    coco_suite_name: str = "bbob",
 ):
     """
     Run NEVO on COCO benchmark problems using proper batch system.
@@ -444,6 +522,8 @@ def run_coco_benchmark(
         Number of CPU cores to use (each core runs a batch)
     use_dl : bool
         Use NengoDL backend for GPU acceleration
+    coco_suite_name : str
+        COCO suite to use (e.g. "bbob", "bbob-noisy", "bbob-largescale", …).
 
     Returns
     -------
@@ -473,6 +553,7 @@ def run_coco_benchmark(
                 total_batches,
                 batch_number,
                 use_dl,
+                coco_suite_name,
             )
         )
 
@@ -506,6 +587,7 @@ def run_benchmark(
     observer: Any = None,
     algorithm_name: str = "NEVO",
     output_dir: Path = None,
+    coco_suite_name: str = "bbob",
 ):
     """
     Run NEVO on a benchmark problem multiple times.
@@ -530,6 +612,8 @@ def run_benchmark(
         COCO observer for logging results (only used with cocoex suite)
     output_dir : Path, optional
         Output directory for saving per-run results (enables resume capability)
+    coco_suite_name : str
+        COCO suite name to use when ``suite="cocoex"`` (default: "bbob").
 
     Returns
     -------
@@ -568,6 +652,7 @@ def run_benchmark(
             dimension=dimension,
             suite=suite,
             observer=observer,
+            coco_suite_name=coco_suite_name,
         )
 
         # Create optimiser
@@ -595,7 +680,7 @@ def run_benchmark(
 
         # Store results
         result = {
-            "suite": suite,
+            "suite": coco_suite_name if suite in ["cocoex", "coco"] else suite,
             "problem_id": problem_id,
             "problem_name": problem.name,
             "instance": instance,
@@ -631,11 +716,13 @@ def run_benchmark(
 
         # Save plot for first run (only if optimum is known)
         if run == 0 and problem.optimum is not None:
+            # Use actual COCO suite name for filename (not just "cocoex")
+            suite_for_filename = coco_suite_name if suite in ["cocoex", "coco"] else suite
             plot_optimisation_results(
                 optimiser,
                 optimum=problem.optimum,
-                title=f"[{suite.upper()}] f{problem_id:02d} i{instance:02d} {dimension}D",
-                save_path=f"benchmark_{suite}_f{problem_id:02d}_i{instance:02d}_{dimension}D.png",
+                title=f"[{suite.upper() if suite != 'cocoex' else coco_suite_name.upper()}] f{problem_id:02d} i{instance:02d} {dimension}D",
+                save_path=f"benchmark_{suite_for_filename}_f{problem_id:02d}_i{instance:02d}_{dimension}D.png",
             )
 
         # Finalize the problem to flush COCO data
@@ -652,7 +739,7 @@ def run_single_experiment(args_tuple):
     ----------
     args_tuple : tuple
         Tuple of (problem_id, instance, dimension, simulation_time, n_runs,
-                  seed_offset, suite, output_dir, algorithm_name)
+                  seed_offset, suite, output_dir, algorithm_name, coco_suite_name)
 
     Returns
     -------
@@ -674,6 +761,7 @@ def run_single_experiment(args_tuple):
         suite,
         output_dir,
         algorithm_name,
+        coco_suite_name,
     ) = args_tuple
 
     # Check if results already exist (for resuming interrupted experiments)
@@ -699,7 +787,7 @@ def run_single_experiment(args_tuple):
         # Create observer for COCO postprocessing with cocopp
         # COCO automatically saves to exdata/<result_folder>
         observer = cocoex.Observer(
-            "bbob",
+            coco_suite_name,
             f"result_folder: {algorithm_name} "
             f"algorithm_name: {algorithm_name} "
             f'algorithm_info: "NEVO neuromorphic optimiser"',
@@ -714,6 +802,7 @@ def run_single_experiment(args_tuple):
         seed_offset=seed_offset,
         suite=suite,
         observer=observer,
+        coco_suite_name=coco_suite_name,
     )
 
     # Save intermediate results
@@ -780,7 +869,25 @@ def main():
         type=str,
         choices=["ioh", "cocoex"],
         default="ioh",
-        help="Benchmark suite to use",
+        help="Benchmark suite to use: 'ioh' or 'cocoex'. "
+             "For cocoex, specify which COCO suite with --coco-suite.",
+    )
+    parser.add_argument(
+        "--coco-suite",
+        type=str,
+        choices=COCO_SUITES,
+        default="bbob",
+        metavar="COCO_SUITE",
+        help=(
+            "Which COCO/cocoex suite to run (only used when --suite cocoex). "
+            "Choices: " + ", ".join(COCO_SUITES) + ". "
+            "Recommended dimensions per suite — "
+            "bbob/bbob-noisy/bbob-biobj/bbob-biobj-ext/bbob-constrained/sbox-cost: 2,3,5,10,20,40; "
+            "bbob-largescale: 20,40,80,160,320,640; "
+            "bbob-mixint: 5,10,20,40,80,160. "
+            "Multi-objective suites (bbob-biobj, bbob-biobj-ext) are scalarised "
+            "to their first objective."
+        ),
     )
     parser.add_argument(
         "--problems",
@@ -801,7 +908,11 @@ def main():
         type=str,
         nargs="+",
         default=["2"],
-        help="Problem dimensions. Supports ranges: 2,5,10 or 2-10 (COCO only supports 2,3,5,10,20,40)",
+        help=(
+            "Problem dimensions. Supports ranges: 2,5,10 or 2-10. "
+            "Valid dims depend on the chosen --coco-suite "
+            "(bbob default: 2,3,5,10,20,40; largescale: 20,40,80,160,320,640)."
+        ),
     )
     parser.add_argument(
         "--time",
@@ -825,7 +936,7 @@ def main():
         "--output-dir",
         type=str,
         default=None,
-        help="Output directory (default: benchmark_results_<suite>)",
+        help="Output directory (default: benchmark_results_<suite>_<coco-suite>)",
     )
     parser.add_argument(
         "--algorithm-name",
@@ -853,14 +964,36 @@ def main():
 
     args = parser.parse_args()
 
+    # Auto-detect cocoex suite if --coco-suite was explicitly set (not default)
+    # This allows users to just pass --coco-suite bbob-largescale without --suite cocoex
+    if args.coco_suite != "bbob" and args.suite == "ioh":
+        print(f"[INFO] --coco-suite {args.coco_suite} specified but --suite not set to cocoex.")
+        print(f"[INFO] Automatically switching to --suite cocoex")
+        args.suite = "cocoex"
+
     # Parse range notation for problems, instances, and dimensions
     args.problems = parse_int_list_arg(args.problems)
     args.instances = parse_int_list_arg(args.instances)
     args.dimensions = parse_int_list_arg(args.dimensions)
 
+    # Warn if chosen dimensions are unusual for the selected COCO suite
+    if args.suite == "cocoex":
+        recommended = COCO_SUITE_DIMS.get(args.coco_suite, [])
+        if recommended:
+            unusual = [d for d in args.dimensions if d not in recommended]
+            if unusual:
+                print(
+                    f"[WARNING] Dimensions {unusual} are not in the recommended set "
+                    f"for suite '{args.coco_suite}': {recommended}. "
+                    "cocoex may raise an error if a dimension is unsupported."
+                )
+
     # Set output directory
     if args.output_dir is None:
-        output_dir = Path(f"benchmark_results_{args.suite}")
+        if args.suite == "cocoex":
+            output_dir = Path(f"benchmark_results_{args.coco_suite.replace('-', '_')}")
+        else:
+            output_dir = Path(f"benchmark_results_{args.suite}")
     else:
         output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
@@ -875,7 +1008,11 @@ def main():
     print(f"\n{'=' * 70}")
     print("NEVO BENCHMARK EXPERIMENT")
     print(f"{'=' * 70}")
-    print(f"Suite:        {args.suite.upper()}")
+    print(f"Suite:        {args.suite.upper()}", end="")
+    if args.suite == "cocoex":
+        print(f" / {args.coco_suite}")
+    else:
+        print()
     print(f"Problems:     {args.problems}")
     print(f"Instances:    {args.instances}")
     print(f"Dimensions:   {args.dimensions}")
@@ -887,6 +1024,11 @@ def main():
         print(f"Algorithm:    {args.algorithm_name}")
         print(f"Batches:      {n_cores} (1 per core)")
         print(f"COCO data:    exdata/{args.algorithm_name}")
+        if args.coco_suite in COCO_MULTIOBJECTIVE_SUITES:
+            print(
+                f"[NOTE] '{args.coco_suite}' is a multi-objective suite. "
+                "NEVO will optimise the first objective only."
+            )
     if args.use_dl:
         print("Backend:      NengoDL (GPU accelerated)")
     print(f"{'=' * 70}\n")
@@ -908,6 +1050,7 @@ def main():
                         args.suite,
                         output_dir,
                         args.algorithm_name,
+                        args.coco_suite,
                     )
                 )
 
@@ -929,6 +1072,7 @@ def main():
             output_dir=output_dir,
             n_cores=n_cores,
             use_dl=args.use_dl,
+            coco_suite_name=args.coco_suite,
         )
     else:
         # IOH suite - use original approach
@@ -982,16 +1126,31 @@ def main():
         print("\n" + "-" * 70)
         print("COCO POSTPROCESSING")
         print("-" * 70)
+        print(f"\nSuite used: {args.coco_suite}")
         print("\nTo postprocess results with cocopp, run:")
         print(f"  python -m cocopp exdata/{args.algorithm_name}")
         print("\nOr to compare with other algorithms:")
         print(
             f"  python -m cocopp exdata/{args.algorithm_name} <other_algorithm_folder>"
         )
-        print("\nAn example could be:")
-        print(
-            f"  python -m cocopp exdata/{args.algorithm_name} bbob/2009/RANDOMSEARCH bbob/2009/PSO! bbob/2012/DE!"
-        )
+        if args.coco_suite == "bbob":
+            print("\nExample with public BBOB baselines:")
+            print(
+                f"  python -m cocopp exdata/{args.algorithm_name} "
+                "bbob/2009/RANDOMSEARCH bbob/2009/PSO! bbob/2012/DE!"
+            )
+        elif args.coco_suite == "bbob-noisy":
+            print("\nExample with public bbob-noisy baselines:")
+            print(
+                f"  python -m cocopp exdata/{args.algorithm_name} "
+                "bbob-noisy/2009/RANDOMSEARCH"
+            )
+        elif args.coco_suite == "bbob-largescale":
+            print("\nExample with public bbob-largescale baselines:")
+            print(
+                f"  python -m cocopp exdata/{args.algorithm_name} "
+                "bbob-largescale/2019/LMCMA"
+            )
         print("\nResults will be generated in the 'ppdata' folder.")
         print("-" * 70)
 

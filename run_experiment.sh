@@ -18,7 +18,9 @@ RUNS=1
 TIME=20.0  # Increased for better convergence (gives ~1M evals with pop_size=100)
 CORES=0
 ALGORITHM_NAME="NEVO"
-OUTPUT_DIR="benchmark_results_cocoex"
+# COCO suite: bbob | bbob-noisy | bbob-largescale | bbob-mixint | bbob-constrained | bbob-biobj | bbob-biobj-ext | sbox-cost
+COCO_SUITE="bbob"
+OUTPUT_DIR="benchmark_results_${COCO_SUITE//-/_}"
 
 # Activate the virtual environment
 echo "Activating the virtual environment and setting up the environment..."
@@ -58,6 +60,7 @@ python ./check_progress.py \
 echo "Starting the benchmark experiment..."
 python ./examples/benchmark_experiment.py \
     --suite cocoex \
+    --coco-suite $COCO_SUITE \
     --problems $PROBLEMS \
     --instances $INSTANCES \
     --dimensions $DIMENSIONS \
