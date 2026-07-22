@@ -246,6 +246,9 @@ def _run_coco_batch(args_tuple):
         batch_number,
         use_dl,
         coco_suite_name,
+        operator_mode,
+        td_enabled,
+        td_lambda,
     ) = args_tuple
 
     import cocoex
@@ -344,6 +347,9 @@ def _run_coco_batch(args_tuple):
                 epsilon=0.15,
                 learning_rate=0.3,
                 seed=seed,
+                operator_mode=operator_mode,
+                td_enabled=td_enabled,
+                td_lambda=td_lambda,
             )
 
             # Run optimisation
@@ -494,6 +500,9 @@ def run_coco_benchmark(
     n_cores: int = 1,
     use_dl: bool = False,
     coco_suite_name: str = "bbob",
+    operator_mode: str = "trad",
+    td_enabled: bool = True,
+    td_lambda: float = 0.0,
 ):
     """
     Run NEVO on COCO benchmark problems using proper batch system.
@@ -524,6 +533,12 @@ def run_coco_benchmark(
         Use NengoDL backend for GPU acceleration
     coco_suite_name : str
         COCO suite to use (e.g. "bbob", "bbob-noisy", "bbob-largescale", …).
+    operator_mode : str
+        Operator selection mode: "trad", "nm_dual", or "nm_softmix".
+    td_enabled : bool
+        Whether to enable TD learning for operator selection.
+    td_lambda : float
+        TD(λ) eligibility trace coefficient (0.0 = TD(0)).
 
     Returns
     -------
@@ -554,6 +569,9 @@ def run_coco_benchmark(
                 batch_number,
                 use_dl,
                 coco_suite_name,
+                operator_mode,
+                td_enabled,
+                td_lambda,
             )
         )
 
@@ -588,6 +606,9 @@ def run_benchmark(
     algorithm_name: str = "NEVO",
     output_dir: Path = None,
     coco_suite_name: str = "bbob",
+    operator_mode: str = "trad",
+    td_enabled: bool = True,
+    td_lambda: float = 0.0,
 ):
     """
     Run NEVO on a benchmark problem multiple times.
@@ -614,6 +635,12 @@ def run_benchmark(
         Output directory for saving per-run results (enables resume capability)
     coco_suite_name : str
         COCO suite name to use when ``suite="cocoex"`` (default: "bbob").
+    operator_mode : str
+        Operator selection mode: "trad", "nm_dual", or "nm_softmix".
+    td_enabled : bool
+        Whether to enable TD learning for operator selection.
+    td_lambda : float
+        TD(λ) eligibility trace coefficient (0.0 = TD(0)).
 
     Returns
     -------
@@ -667,6 +694,9 @@ def run_benchmark(
             epsilon=0.15,  # Slightly more exploration
             learning_rate=0.3,  # Slightly lower for stability
             seed=seed_offset + run,
+            operator_mode=operator_mode,
+            td_enabled=td_enabled,
+            td_lambda=td_lambda,
         )
 
         # Run optimisation
@@ -739,7 +769,8 @@ def run_single_experiment(args_tuple):
     ----------
     args_tuple : tuple
         Tuple of (problem_id, instance, dimension, simulation_time, n_runs,
-                  seed_offset, suite, output_dir, algorithm_name, coco_suite_name)
+                  seed_offset, suite, output_dir, algorithm_name, coco_suite_name,
+                  operator_mode, td_enabled, td_lambda)
 
     Returns
     -------
@@ -762,6 +793,9 @@ def run_single_experiment(args_tuple):
         output_dir,
         algorithm_name,
         coco_suite_name,
+        operator_mode,
+        td_enabled,
+        td_lambda,
     ) = args_tuple
 
     # Check if results already exist (for resuming interrupted experiments)
@@ -803,6 +837,9 @@ def run_single_experiment(args_tuple):
         suite=suite,
         observer=observer,
         coco_suite_name=coco_suite_name,
+        operator_mode=operator_mode,
+        td_enabled=td_enabled,
+        td_lambda=td_lambda,
     )
 
     # Save intermediate results
@@ -961,6 +998,30 @@ def main():
         action="store_true",
         help="Use NengoDL backend for GPU acceleration (requires nengo-dl and tensorflow)",
     )
+    parser.add_argument(
+        "--operator-mode",
+        type=str,
+        choices=["trad", "traditional", "nm_dual", "nm_softmix"],
+        default="trad",
+        help=(
+            "Operator selection mode: "
+            "'trad'/'traditional' = 13 standard operators (default), "
+            "'nm_dual' = 2 neuromorphic ensembles, "
+            "'nm_softmix' = neuromorphic ensembles with soft blending."
+        ),
+    )
+    parser.add_argument(
+        "--no-td",
+        action="store_true",
+        default=False,
+        help="Disable TD learning for operator selection (enabled by default).",
+    )
+    parser.add_argument(
+        "--td-lambda",
+        type=float,
+        default=0.0,
+        help="TD(λ) eligibility trace coefficient. 0.0 = TD(0), e.g. 0.9 = TD(λ).",
+    )
 
     args = parser.parse_args()
 
@@ -988,12 +1049,17 @@ def main():
                     "cocoex may raise an error if a dimension is unsupported."
                 )
 
-    # Set output directory
+    # Resolve td_enabled from --no-td flag
+    td_enabled = not args.no_td
+
+    # Set output directory — include operator_mode suffix to avoid collisions
+    # across different configuration runs
     if args.output_dir is None:
         if args.suite == "cocoex":
-            output_dir = Path(f"benchmark_results_{args.coco_suite.replace('-', '_')}")
+            base = f"benchmark_results_{args.coco_suite.replace('-', '_')}"
         else:
-            output_dir = Path(f"benchmark_results_{args.suite}")
+            base = f"benchmark_results_{args.suite}"
+        output_dir = Path(f"{base}_{args.operator_mode}")
     else:
         output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
@@ -1020,6 +1086,9 @@ def main():
     print(f"Runs:         {args.runs}")
     print(f"Cores:        {n_cores}")
     print(f"Output:       {output_dir}")
+    print(f"Op. mode:     {args.operator_mode}")
+    print(f"TD learning:  {'enabled' if td_enabled else 'disabled'}")
+    print(f"TD lambda:    {args.td_lambda}")
     if args.suite == "cocoex":
         print(f"Algorithm:    {args.algorithm_name}")
         print(f"Batches:      {n_cores} (1 per core)")
@@ -1051,6 +1120,9 @@ def main():
                         output_dir,
                         args.algorithm_name,
                         args.coco_suite,
+                        args.operator_mode,
+                        td_enabled,
+                        args.td_lambda,
                     )
                 )
 
@@ -1073,6 +1145,9 @@ def main():
             n_cores=n_cores,
             use_dl=args.use_dl,
             coco_suite_name=args.coco_suite,
+            operator_mode=args.operator_mode,
+            td_enabled=td_enabled,
+            td_lambda=args.td_lambda,
         )
     else:
         # IOH suite - use original approach

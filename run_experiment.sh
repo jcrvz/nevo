@@ -20,7 +20,18 @@ CORES=0
 ALGORITHM_NAME="NEVO"
 # COCO suite: bbob | bbob-noisy | bbob-largescale | bbob-mixint | bbob-constrained | bbob-biobj | bbob-biobj-ext | sbox-cost
 COCO_SUITE="bbob"
-OUTPUT_DIR="benchmark_results_${COCO_SUITE//-/_}"
+
+# --- Variant parameters ---
+# Operator mode: trad | nm_dual | nm_softmix  (default: trad)
+OPERATOR_MODE="trad"
+# TD learning: true | false  (default: true = enabled)
+TD_ENABLED=true
+# TD(λ) coefficient: 0.0 = TD(0), e.g. 0.9 = TD(λ)  (default: 0.0)
+TD_LAMBDA=0.0
+
+# Output directory — auto-includes operator mode to avoid collisions between variants
+# Override by setting OUTPUT_DIR explicitly (e.g. OUTPUT_DIR="my_results")
+OUTPUT_DIR="benchmark_results_${COCO_SUITE//-/_}_${OPERATOR_MODE}"
 
 # Activate the virtual environment
 echo "Activating the virtual environment and setting up the environment..."
@@ -58,6 +69,12 @@ python ./check_progress.py \
     --output-dir $OUTPUT_DIR
 
 echo "Starting the benchmark experiment..."
+# Build optional flags
+TD_FLAG=""
+if [ "$TD_ENABLED" = false ]; then
+    TD_FLAG="--no-td"
+fi
+
 python ./examples/benchmark_experiment.py \
     --suite cocoex \
     --coco-suite $COCO_SUITE \
@@ -68,6 +85,9 @@ python ./examples/benchmark_experiment.py \
     --runs $RUNS \
     --cores $CORES \
     $USE_DL \
+    --operator-mode $OPERATOR_MODE \
+    --td-lambda $TD_LAMBDA \
+    $TD_FLAG \
     --algorithm-name $ALGORITHM_NAME \
     --output-dir $OUTPUT_DIR
 
