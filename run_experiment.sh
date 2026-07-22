@@ -10,7 +10,7 @@
 # -t night
 # -l nodes=4,walltime=12:00:00
 
-# Experiment parameters (define once, use everywhere)
+# Default experiment parameters
 PROBLEMS="1-24"
 INSTANCES="1-15"
 DIMENSIONS="2,3,5,10,20,40"
@@ -21,17 +21,30 @@ ALGORITHM_NAME="NEVO"
 # COCO suite: bbob | bbob-noisy | bbob-largescale | bbob-mixint | bbob-constrained | bbob-biobj | bbob-biobj-ext | sbox-cost
 COCO_SUITE="bbob"
 
-# --- Variant parameters ---
-# Operator mode: trad | nm_dual | nm_softmix  (default: trad)
+# --- Variant parameters (defaults match original trad implementation) ---
+# Operator mode: trad | nm_dual | nm_softmix
 OPERATOR_MODE="trad"
-# TD learning: true | false  (default: true = enabled)
+# TD learning: true | false
 TD_ENABLED=true
-# TD(λ) coefficient: 0.0 = TD(0), e.g. 0.9 = TD(λ)  (default: 0.0)
+# TD(λ) coefficient: 0.0 = TD(0), e.g. 0.9 = TD(λ)
 TD_LAMBDA=0.0
 
-# Output directory — auto-includes operator mode to avoid collisions between variants
-# Override by setting OUTPUT_DIR explicitly (e.g. OUTPUT_DIR="my_results")
-OUTPUT_DIR="benchmark_results_${COCO_SUITE//-/_}_${OPERATOR_MODE}"
+# --- Load config file if provided as first argument ---
+# Usage: bash run_experiment.sh configs/nm_dual_td0.conf
+# Available configs in configs/: trad_eps_greedy, trad_td0, trad_td_lambda,
+#   nm_dual_eps_greedy, nm_dual_td0, nm_dual_td_lambda,
+#   nm_softmix_eps_greedy, nm_softmix_td0, nm_softmix_td_lambda
+if [ -n "$1" ] && [ -f "$1" ]; then
+    echo "Loading config: $1"
+    source "$1"
+elif [ -n "$1" ]; then
+    echo "Error: config file '$1' not found."
+    exit 1
+fi
+
+# Derived parameters — computed after config is loaded so overrides take effect
+# OUTPUT_DIR can be pre-set in a config file; otherwise auto-generated
+OUTPUT_DIR="${OUTPUT_DIR:-benchmark_results_${COCO_SUITE//-/_}_${OPERATOR_MODE}}"
 
 # Activate the virtual environment
 echo "Activating the virtual environment and setting up the environment..."
