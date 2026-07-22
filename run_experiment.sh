@@ -1,8 +1,9 @@
 #!/bin/bash
 #OAR -n NEVOptExp1
-#OAR -l nodes=9,walltime=12:00:00
-#OAR -p nova
+#OAR -l nodes=9,walltime=10:00:00
+#OAR -p neowise
 #OAR -t exotic
+#OAR -t night
 #OAR --stdout ./logs/%jobid%.stdout
 #OAR --stderr ./logs/%jobid%.stderr
 
