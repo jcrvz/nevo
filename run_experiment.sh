@@ -56,6 +56,7 @@ else
     USE_DL=""
 fi
 
+# I'm mainly using CPU for now ...
 USE_DL=""
 CORES=0
 
