@@ -1,5 +1,5 @@
 #!/bin/bash
-#OAR -n NEVOptExp1
+#OAR -n NEVOpt-Benchmark
 #OAR -l nodes=9,walltime=10:00:00
 #OAR -p neowise
 #OAR -t exotic
@@ -9,6 +9,7 @@
 
 # OAR job script to run the benchmark experiment using NEVO algorithm
 # -t night
+# -t exotic
 # -l nodes=4,walltime=12:00:00
 
 # Default experiment parameters
@@ -44,8 +45,10 @@ elif [ -n "$1" ]; then
 fi
 
 # Derived parameters — computed after config is loaded so overrides take effect
-# OUTPUT_DIR can be pre-set in a config file; otherwise auto-generated
-OUTPUT_DIR="${OUTPUT_DIR:-benchmark_results_${COCO_SUITE//-/_}_${OPERATOR_MODE}}"
+# Use the full ALGORITHM_NAME (minus the "NEVO_" prefix) so each variant gets
+# its own folder, e.g. benchmark_results_bbob_nm_softmix_eps_greedy
+VARIANT="${ALGORITHM_NAME#NEVO_}"
+OUTPUT_DIR="${OUTPUT_DIR:-benchmark_results_${COCO_SUITE//-/_}_${VARIANT}}"
 
 # Activate the virtual environment
 echo "Activating the virtual environment and setting up the environment..."
