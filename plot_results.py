@@ -112,6 +112,9 @@ OPERATOR_COLORS = {
     "GeneticMutation": "#fc8d62",
     "SimulatedAnnealing": "#8da0cb",
     "TabuSearch": "#e78ac3",
+    # Neuromorphic operators
+    "NeuromorphicExplorationEnsemble": "#1b9e77",
+    "NeuromorphicExploitationEnsemble": "#d95f02",
 }
 
 # Short names for operators (for better readability in plots)
@@ -129,11 +132,17 @@ OPERATOR_SHORT_NAMES = {
     "GeneticMutation": "GM",
     "SimulatedAnnealing": "SA",
     "TabuSearch": "TS",
+    # Neuromorphic operators
+    "NeuromorphicExplorationEnsemble": "NEX",
+    "NeuromorphicExploitationEnsemble": "NXP",
 }
 
+# Reverse mapping: short name → full name
+OPERATOR_FULL_NAMES = {v: k for k, v in OPERATOR_SHORT_NAMES.items()}
+
 # Operator order: Exploitation (simple→complex) then Exploration (simple→complex)
-# Exploitation: SO, PSO, TS, SA, GM, LW
-# Exploration: GSA, FA, CFO, DE, GX, LF, RS
+# Exploitation: SO, PSO, TS, SA, GM, LW, NXP
+# Exploration: GSA, FA, CFO, DE, GX, LF, RS, NEX
 OPERATOR_ORDER = [
     "SO",
     "PS",
@@ -141,6 +150,7 @@ OPERATOR_ORDER = [
     "SA",
     "GM",
     "LW",
+    "NXP",
     "GS",
     "FA",
     "CF",
@@ -148,6 +158,7 @@ OPERATOR_ORDER = [
     "GX",
     "LF",
     "RS",
+    "NEX",
 ]
 
 # Operator type classification
@@ -158,6 +169,7 @@ OPERATOR_TYPE = {
     "SA": "Exploitation",
     "GM": "Exploitation",
     "LW": "Exploitation",
+    "NXP": "Exploitation",
     "GS": "Exploration",
     "FA": "Exploration",
     "CF": "Exploration",
@@ -165,7 +177,34 @@ OPERATOR_TYPE = {
     "GX": "Exploration",
     "LF": "Exploration",
     "RS": "Exploration",
+    "NEX": "Exploration",
 }
+
+
+def get_short_name(full_name: str) -> str:
+    """Return short name for an operator, falling back to the full name."""
+    return OPERATOR_SHORT_NAMES.get(full_name, full_name)
+
+
+def get_full_name(short_name: str) -> str:
+    """Return full name for a short operator name, falling back to the short name."""
+    return OPERATOR_FULL_NAMES.get(short_name, short_name)
+
+
+def get_color(short_name: str) -> str:
+    """Return plot color for an operator short name."""
+    full = get_full_name(short_name)
+    return OPERATOR_COLORS.get(full, "#888888")
+
+
+def get_ordered_ops(available: list) -> list:
+    """
+    Return operators sorted by OPERATOR_ORDER, with any unknown operators
+    appended at the end so they are never silently dropped from plots.
+    """
+    known = [op for op in OPERATOR_ORDER if op in available]
+    extra = [op for op in available if op not in OPERATOR_ORDER]
+    return known + extra
 
 # BBOB function categories
 BBOB_CATEGORIES = {
@@ -288,7 +327,7 @@ def melt_operator_data(
 
     # Extract operator name
     melted["operator"] = melted["operator_metric"].str.replace(f"op_{metric}_", "")
-    melted["operator_short"] = melted["operator"].map(OPERATOR_SHORT_NAMES)
+    melted["operator_short"] = melted["operator"].apply(get_short_name)
 
     return melted
 
@@ -320,7 +359,7 @@ def plot_weights_by_dimension(df: pd.DataFrame, operators: list, output_dir: Pat
     pivot = summary.pivot(index="operator_short", columns="dimension", values="value")
 
     # Sort operators by predefined order
-    ordered_ops = [op for op in OPERATOR_ORDER if op in pivot.index]
+    ordered_ops = get_ordered_ops(list(pivot.index))
     pivot = pivot.loc[ordered_ops]
 
     # Plot with custom colors
@@ -378,7 +417,7 @@ def plot_weights_by_category(df: pd.DataFrame, operators: list, output_dir: Path
     pivot = pivot[[c for c in cat_order if c in pivot.columns]]
 
     # Sort operators by predefined order
-    ordered_ops = [op for op in OPERATOR_ORDER if op in pivot.index]
+    ordered_ops = get_ordered_ops(list(pivot.index))
     pivot = pivot.loc[ordered_ops]
 
     # Plot
@@ -427,7 +466,7 @@ def plot_weights_heatmap_dimension(df: pd.DataFrame, operators: list, output_dir
     pivot = summary.pivot(index="operator_short", columns="dimension", values="value")
 
     # Sort operators by predefined order
-    ordered_ops = [op for op in OPERATOR_ORDER if op in pivot.index]
+    ordered_ops = get_ordered_ops(list(pivot.index))
     pivot = pivot.loc[ordered_ops]
 
     fig, ax = plt.subplots(figsize=FIGSIZE_SINGLE_TALL)
@@ -509,7 +548,7 @@ def plot_weights_heatmap_category_dimension(
         pivot = pivot[cat_order]
 
         # Sort operators by predefined order
-        ordered_ops = [op for op in OPERATOR_ORDER if op in pivot.index]
+        ordered_ops = get_ordered_ops(list(pivot.index))
         pivot = pivot.loc[ordered_ops]
 
         # Only show colorbar on rightmost column
@@ -587,7 +626,7 @@ def plot_success_rate_by_dimension(df: pd.DataFrame, operators: list, output_dir
     pivot = summary.pivot(index="operator_short", columns="dimension", values="value")
 
     # Sort operators by predefined order
-    ordered_ops = [op for op in OPERATOR_ORDER if op in pivot.index]
+    ordered_ops = get_ordered_ops(list(pivot.index))
     pivot = pivot.loc[ordered_ops]
 
     pivot.plot(kind="bar", ax=ax, width=0.75, edgecolor="black", linewidth=0.5)
@@ -637,7 +676,7 @@ def plot_operator_usage_distribution(
     fig, ax = plt.subplots(figsize=FIGSIZE_SINGLE_TALL)
 
     # Use predefined operator order
-    order = [op for op in OPERATOR_ORDER if op in melted["operator_short"].unique()]
+    order = get_ordered_ops(list(melted["operator_short"].unique()))
 
     sns.boxplot(
         data=melted,
@@ -649,6 +688,16 @@ def plot_operator_usage_distribution(
         linewidth=0.8,
         fliersize=3,
     )
+    # sns.violinplot(
+    #     data=melted,
+    #     x="operator_short",
+    #     y="value",
+    #     order=order,
+    #     ax=ax,
+    #     palette="Set2",
+    #     linewidth=0.8,
+    #     fliersize=3,
+    # )
 
     ax.set_xlabel(r"Operator, $h_o$")
     ax.set_ylabel(r"Usage Count")
@@ -684,7 +733,7 @@ def plot_weights_per_function(df: pd.DataFrame, operators: list, output_dir: Pat
     pivot = summary.pivot(index="operator_short", columns="problem_id", values="value")
 
     # Sort operators by predefined order
-    ordered_ops = [op for op in OPERATOR_ORDER if op in pivot.index]
+    ordered_ops = get_ordered_ops(list(pivot.index))
     pivot = pivot.loc[ordered_ops]
 
     fig, ax = plt.subplots(figsize=FIGSIZE_SINGLE)
@@ -736,12 +785,7 @@ def plot_top_operators_by_category(df: pd.DataFrame, operators: list, output_dir
         )
         top5 = summary.head(5)
 
-        colors = [
-            OPERATOR_COLORS.get(
-                [k for k, v in OPERATOR_SHORT_NAMES.items() if v == op][0], "#999999"
-            )
-            for op in top5.index
-        ]
+        colors = [get_color(op) for op in top5.index]
 
         bars = ax.barh(
             range(len(top5)),
@@ -817,9 +861,7 @@ def plot_weight_vs_success_correlation(
     fig, ax = plt.subplots(figsize=(1.5 * SINGLE_COL_WIDTH, SINGLE_COL_WIDTH / 2))
 
     colors = [
-        OPERATOR_COLORS.get(
-            [k for k, v in OPERATOR_SHORT_NAMES.items() if v == op][0], "#999999"
-        )
+        get_color(op)
         for op in merged["operator_short"]
     ]
     shapes = [
@@ -908,6 +950,7 @@ def plot_performance_summary(df: pd.DataFrame, output_dir: Path):
         linewidth=0.8,
         fliersize=2,
     )
+
     ax.set_xlabel(r"Dimension, $D$")
     ax.set_ylabel(r"Evals./second")
     ax.set_yscale("log")
@@ -955,14 +998,11 @@ def plot_dimension_scaling(df: pd.DataFrame, operators: list, output_dir: Path):
     fig, ax = plt.subplots(figsize=FIGSIZE_SINGLE)
 
     # Line plot for each operator in predefined order
-    for i, op in enumerate(OPERATOR_ORDER):
-        if op not in melted["operator_short"].unique():
-            continue
+    for i, op in enumerate(get_ordered_ops(list(melted["operator_short"].unique()))):
         subset = melted[melted["operator_short"] == op]
         means = subset.groupby("dimension")["value"].mean()
 
-        full_op_name = [k for k, v in OPERATOR_SHORT_NAMES.items() if v == op][0]
-        color = OPERATOR_COLORS.get(full_op_name, "#999999")
+        color = get_color(op)
 
         # Different markers for exploitation vs exploration
         marker = "o" if OPERATOR_TYPE.get(op) == "Exploitation" else "s"
@@ -1031,7 +1071,7 @@ def plot_operator_ranking_by_dimension(
     pivot = rank_df.pivot(index="operator", columns="dimension", values="rank")
 
     # Sort by predefined operator order
-    ordered_ops = [op for op in OPERATOR_ORDER if op in pivot.index]
+    ordered_ops = get_ordered_ops(list(pivot.index))
     pivot = pivot.loc[ordered_ops]
 
     sns.heatmap(
@@ -1068,7 +1108,7 @@ def plot_weights_by_dimension_boxswarm(
     """
     melted = melt_operator_data(df, operators, "weight")
     fig, ax = plt.subplots(figsize=FIGSIZE_SINGLE)
-    order = [op for op in OPERATOR_ORDER if op in melted["operator_short"].unique()]
+    order = get_ordered_ops(list(melted["operator_short"].unique()))
     dims = sorted(melted["dimension"].unique())
     palette = sns.color_palette("Set2", n_colors=len(dims))
 
@@ -1129,7 +1169,7 @@ def plot_weights_by_category_boxswarm(
     """
     melted = melt_operator_data(df, operators, "weight")
     fig, ax = plt.subplots(figsize=FIGSIZE_SINGLE_TALL)
-    order = [op for op in OPERATOR_ORDER if op in melted["operator_short"].unique()]
+    order = get_ordered_ops(list(melted["operator_short"].unique()))
     cats = [c for c in BBOB_CATEGORIES.keys() if c in melted["category"].unique()]
     palette = sns.color_palette("Set2", n_colors=len(cats))
 
@@ -1192,7 +1232,7 @@ def plot_success_rate_by_dimension_boxswarm(
     """
     melted = melt_operator_data(df, operators, "success")
     fig, ax = plt.subplots(figsize=FIGSIZE_SINGLE)
-    order = [op for op in OPERATOR_ORDER if op in melted["operator_short"].unique()]
+    order = get_ordered_ops(list(melted["operator_short"].unique()))
     dims = sorted(melted["dimension"].unique())
     palette = sns.color_palette("Set2", n_colors=len(dims))
 
@@ -1266,7 +1306,7 @@ def main():
 
     # Create output directory
     output_dir = Path(args.output_dir)
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(exist_ok=True, parents=True)
 
     print(f"\n{'=' * 60}")
     print("NEVO Results Visualization")
@@ -1291,14 +1331,14 @@ def main():
 
     # Generate all plots
 
-    # plot_weights_heatmap_dimension(df, operators, output_dir)
+    plot_weights_heatmap_dimension(df, operators, output_dir)
     plot_weights_heatmap_category_dimension(df, operators, output_dir)
-    # plot_success_rate_by_dimension(df, operators, output_dir)
-    # plot_dimension_scaling(df, operators, output_dir)
-    # plot_weights_per_function(df, operators, output_dir)
+    plot_success_rate_by_dimension(df, operators, output_dir)
+    plot_dimension_scaling(df, operators, output_dir)
+    plot_weights_per_function(df, operators, output_dir)
 
-    # plot_performance_summary(df, output_dir)
-    # plot_weight_vs_success_correlation(df, operators, output_dir)
+    plot_performance_summary(df, output_dir)
+    plot_weight_vs_success_correlation(df, operators, output_dir)
 
     # -x-
     # plot_weights_by_dimension(df, operators, output_dir)
