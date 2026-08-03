@@ -295,8 +295,6 @@ def _run_coco_batch(args_tuple):
             if not batcher.is_in_batch(problem):
                 continue
 
-            problem.observe_with(observer)
-
             problem_id = problem.id_function
             instance = problem.id_instance
             dimension = problem.dimension
@@ -308,7 +306,9 @@ def _run_coco_batch(args_tuple):
                 f"f{problem_id:02d}, i{instance}, {dimension}D, run {run + 1}/{n_runs}"
             )
 
-            # Check if this specific run already exists (for resuming interrupted experiments)
+            # Check if this specific run already exists (for resuming interrupted experiments).
+            # IMPORTANT: this check must happen BEFORE observe_with() so that skipped runs
+            # do not register an empty entry in the COCO observer's data files.
             if output_dir is not None:
                 run_results_file = (
                     Path(output_dir)
@@ -323,6 +323,9 @@ def _run_coco_batch(args_tuple):
                             continue
                     except Exception:
                         pass  # Ignore corrupted files, re-run
+
+            # Attach observer only for runs we are actually going to execute.
+            problem.observe_with(observer)
 
             # Get bounds
             lb = np.array(problem.lower_bounds)
@@ -390,7 +393,13 @@ def _run_coco_batch(args_tuple):
 
             all_results.append(result)
 
-            # Save intermediate results
+            # Flush COCO data BEFORE writing the CSV completion marker.
+            # The COCO C++ backend only guarantees a flush when the problem is freed.
+            # If we write the CSV first and then crash, the next session would see the
+            # CSV, skip the run, and COCO data would be permanently missing.
+            problem.free()
+
+            # Save intermediate results (completion marker — written after COCO flush)
             if output_dir is not None:
                 pd.DataFrame([result]).to_csv(
                     Path(output_dir)
