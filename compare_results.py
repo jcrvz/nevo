@@ -128,11 +128,11 @@ _USE_VIOLIN: bool = False
 
 # BBOB categories
 BBOB_CATEGORIES = {
-    "separ\n(f1-f5)": [1, 2, 3, 4, 5],
-    "lcond\n(f6-f9)": [6, 7, 8, 9],
-    "hcond\n(f10-14)": [10, 11, 12, 13, 14],
-    "multi\n(f15-19)": [15, 16, 17, 18, 19],
-    "multi2\n(f20-24)": [20, 21, 22, 23, 24],
+    "separ": [1, 2, 3, 4, 5],
+    "lcond": [6, 7, 8, 9],
+    "hcond": [10, 11, 12, 13, 14],
+    "multi": [15, 16, 17, 18, 19],
+    "multi2": [20, 21, 22, 23, 24],
 }
 
 FUNCTION_TO_CATEGORY = {
@@ -394,6 +394,178 @@ def save_fig(fig, output_dir: Path, stem: str):
         fig.savefig(output_dir / f"{stem}.{ext}", dpi=DPI, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved: {stem}.pdf/png")
+
+
+# Marker cycle for scatter plots — one shape per experiment
+_SCATTER_MARKERS = ["o", "s", "^", "D", "v", "P", "h", "*", "X", "<"]
+
+
+def _scatter_perf_vs_walltime(
+    ax,
+    agg: pd.DataFrame,
+    *,
+    exps: list,
+    group_col: str,
+    group_palette: dict,
+    group_title: str,
+):
+    """
+    Core scatter logic shared by the two perf-vs-walltime plots.
+    *agg* must contain columns: experiment, wall_med, log_perf, <group_col>.
+    Markers encode experiment; colours encode group_col.
+    Returns (marker_handles, colour_handles) for legend construction.
+    """
+    exp_markers = {exp: _SCATTER_MARKERS[i % len(_SCATTER_MARKERS)] for i, exp in enumerate(exps)}
+    groups = [g for g in group_palette if g in agg[group_col].unique()]
+
+    for exp in exps:
+        for grp in groups:
+            sub = agg[(agg["experiment"] == exp) & (agg[group_col] == grp)]
+            if sub.empty:
+                continue
+            fc = group_palette[grp]
+            ec = _darken_color(fc)
+            ax.scatter(
+                sub["wall_med"], sub["log_perf"],
+                marker=exp_markers[exp],
+                color=fc,
+                edgecolors=ec,
+                s=20, alpha=0.78, linewidths=0.5,
+                zorder=3,
+            )
+
+    marker_handles = [
+        plt.Line2D(
+            [0], [0], marker=exp_markers[exp], color="none",
+            markerfacecolor="#555555", markeredgecolor="#222222",
+            markeredgewidth=0.5, markersize=5, linestyle="None", label=exp,
+        )
+        for exp in exps
+    ]
+    colour_handles = [
+        mpatches.Patch(
+            facecolor=group_palette[g],
+            edgecolor=_darken_color(group_palette[g]),
+            linewidth=0.8, label=str(g),
+        )
+        for g in groups
+    ]
+    return marker_handles, colour_handles
+
+
+def plot_perf_vs_walltime_by_dimension(df: pd.DataFrame, output_dir: Path):
+    """
+    Scatter plot: median performance (error) vs median wall time.
+    Each point = median over all instances of one (experiment, dimension, problem_id) triple.
+    Marker shape encodes experiment; fill colour encodes problem dimension.
+
+    Caption: Performance–cost trade-off. Each point summarises one (configuration,
+    dimension, function) triple (median over instances). Lower-left is ideal.
+    """
+    if "perf" not in df.columns or "wall_time" not in df.columns:
+        print("  Skipping perf_vs_walltime_by_dimension: columns missing.")
+        return
+
+    exps = sorted_experiments(df)
+    dims = sorted(df["dimension"].unique())
+    dim_palette = dict(zip(dims, sns.color_palette("Set2", n_colors=len(dims))))
+
+    agg = (
+        df.groupby(["experiment", "dimension", "problem_id"])
+        .agg(perf_med=("perf", "median"), wall_med=("wall_time", "median"))
+        .reset_index()
+    )
+    agg["log_perf"] = _log_perf(agg["perf_med"])
+    agg["__grp__"] = agg["dimension"]
+    dim_palette_generic = {d: dim_palette[d] for d in dims}
+
+    fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
+
+    marker_handles, colour_handles = _scatter_perf_vs_walltime(
+        ax, agg, exps=exps,
+        group_col="__grp__", group_palette=dim_palette_generic,
+        group_title=r"$D$",
+    )
+
+    leg1 = ax.legend(
+        handles=marker_handles, title="Implementation",
+        bbox_to_anchor=(1.0, 1.0), loc="upper left",
+        frameon=False, fontsize=7, title_fontsize=7, ncol=1,
+        alignment="left",
+        handlelength=0.8, borderpad=0.5,
+    )
+    ax.add_artist(leg1)
+    ax.legend(
+        handles=colour_handles, title=r"Dimensionality",
+        bbox_to_anchor=(1.0, 0.0), loc="lower left",
+        alignment="left",
+        frameon=False, fontsize=7, title_fontsize=7, ncol=2,
+        handlelength=0.5, borderpad=0.1,
+    )
+
+    ax.set_xlabel(r"Median Wall Time (s)")
+    ax.set_ylabel(_PERF_LOG_LABEL)
+    ax.set_xscale("log")
+    ensure_box_spines(ax)
+    plt.tight_layout()
+    save_fig(fig, output_dir, "comparison_perf_vs_walltime_by_dimension")
+
+
+def plot_perf_vs_walltime_by_category(df: pd.DataFrame, output_dir: Path):
+    """
+    Scatter plot: median performance (error) vs median wall time.
+    Each point = median over all instances of one (experiment, dimension, problem_id) triple.
+    Marker shape encodes experiment; fill colour encodes BBOB function category.
+
+    Caption: Performance–cost trade-off coloured by BBOB category. Reveals which
+    problem structures drive the perf/wall-time relationship for each configuration.
+    """
+    if "perf" not in df.columns or "wall_time" not in df.columns or "category" not in df.columns:
+        print("  Skipping perf_vs_walltime_by_category: columns missing.")
+        return
+
+    exps = sorted_experiments(df)
+    cats = [c for c in BBOB_CATEGORIES if c in df["category"].unique()]
+    cat_palette = dict(zip(cats, sns.color_palette("Set2", n_colors=len(cats))))
+
+    agg = (
+        df.groupby(["experiment", "dimension", "problem_id", "category"])
+        .agg(perf_med=("perf", "median"), wall_med=("wall_time", "median"))
+        .reset_index()
+    )
+    agg["log_perf"] = _log_perf(agg["perf_med"])
+    agg["__grp__"] = agg["category"]
+
+    fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
+
+    marker_handles, colour_handles = _scatter_perf_vs_walltime(
+        ax, agg, exps=exps,
+        group_col="__grp__", group_palette=cat_palette,
+        group_title="Category",
+    )
+
+    leg1 = ax.legend(
+        handles=marker_handles, title="Implementation",
+        bbox_to_anchor=(1.0, 1.0), loc="upper left",
+        alignment="left",
+        frameon=False, fontsize=7, title_fontsize=7, ncol=1,
+        handlelength=0.8, borderpad=0.5,
+    )
+    ax.add_artist(leg1)
+    ax.legend(
+        handles=colour_handles, title="Category",
+        bbox_to_anchor=(1.0, 0.0), loc="lower left",
+        alignment="left",
+        frameon=False, fontsize=7, title_fontsize=7, ncol=2,
+        handlelength=0.5, borderpad=0.1, columnspacing=1.0,
+    )
+
+    ax.set_xlabel(r"Median Wall Time (s)")
+    ax.set_ylabel(_PERF_LOG_LABEL)
+    ax.set_xscale("log")
+    ensure_box_spines(ax)
+    plt.tight_layout()
+    save_fig(fig, output_dir, "comparison_perf_vs_walltime_by_category")
 
 
 def _distplot(ax, *, data, x, y, hue, hue_order, palette, **kwargs):
@@ -1165,6 +1337,8 @@ def main():
     plot_wall_time(df, output_dir)
     plot_evals_per_second(df, output_dir)
     plot_timing_summary(df, output_dir)
+    plot_perf_vs_walltime_by_dimension(df, output_dir)
+    plot_perf_vs_walltime_by_category(df, output_dir)
 
     if not args.no_operator_breakdown:
         plot_operator_mode_breakdown(df, output_dir)
