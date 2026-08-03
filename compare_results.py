@@ -507,7 +507,7 @@ def plot_perf_vs_walltime_by_dimension(df: pd.DataFrame, output_dir: Path):
     ax.set_ylabel(_PERF_LOG_LABEL)
     ax.set_xscale("log")
     ensure_box_spines(ax)
-    plt.tight_layout()
+    fig.subplots_adjust(left=0.09, right=0.67, top=0.96, bottom=0.16)
     save_fig(fig, output_dir, "comparison_perf_vs_walltime_by_dimension")
 
 
@@ -564,7 +564,7 @@ def plot_perf_vs_walltime_by_category(df: pd.DataFrame, output_dir: Path):
     ax.set_ylabel(_PERF_LOG_LABEL)
     ax.set_xscale("log")
     ensure_box_spines(ax)
-    plt.tight_layout()
+    fig.subplots_adjust(left=0.09, right=0.67, top=0.96, bottom=0.16)
     save_fig(fig, output_dir, "comparison_perf_vs_walltime_by_category")
 
 
