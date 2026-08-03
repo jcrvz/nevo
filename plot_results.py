@@ -9,7 +9,9 @@ Focuses on operator weights, success rates, and performance by dimension/categor
 Designed for IEEE two-column format (10pt font).
 """
 
+import numpy as np
 import pandas as pd
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
@@ -246,6 +248,60 @@ def ensure_box_spines(ax):
         ax.spines[spine].set_visible(True)
         ax.spines[spine].set_linewidth(0.8)
         ax.spines[spine].set_color("black")
+
+
+def _darken_color(rgba, factor=0.65):
+    """Return a darkened RGBA by reducing lightness in HLS space."""
+    import colorsys
+    r, g, b = float(rgba[0]), float(rgba[1]), float(rgba[2])
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    rd, gd, bd = colorsys.hls_to_rgb(h, max(0.0, l * factor), s)
+    return (rd, gd, bd)
+
+
+def colorize_boxplot(ax):
+    """
+    Color box edges, whiskers, caps, and fliers darker than their fill.
+    Median lines are left untouched so they remain visible.
+    Legend handle edges are updated to match.
+    """
+    box_info = []
+    for p in ax.patches:
+        if isinstance(p, mpatches.PathPatch):
+            verts = p.get_path().vertices
+            xmin, xmax = verts[:, 0].min(), verts[:, 0].max()
+            box_width = xmax - xmin
+            fc = p.get_facecolor()
+            dark = _darken_color(fc)
+            p.set_edgecolor(dark)
+            box_info.append((xmin, xmax, box_width, dark))
+
+    for line in ax.lines:
+        xdata = line.get_xdata()
+        if len(xdata) == 0:
+            continue
+        x_mean = float(np.mean(xdata))
+        x_span = float(max(xdata) - min(xdata))
+        has_marker = line.get_marker() not in ("", "None", None)
+
+        for xmin, xmax, box_width, dark in box_info:
+            if xmin - 0.01 <= x_mean <= xmax + 0.01:
+                # Median: no marker, x_span ≈ box_width → skip, keep visible
+                is_median = (not has_marker) and (box_width > 0) and (
+                    abs(x_span - box_width) / box_width < 0.05
+                )
+                if not is_median:
+                    line.set_color(dark)
+                    line.set_markerfacecolor(dark)
+                    line.set_markeredgecolor(dark)
+                break
+
+    # Keep legend handle edges consistent with the darkened box edges
+    legend = ax.get_legend()
+    if legend:
+        for handle in legend.legend_handles:
+            if isinstance(handle, mpatches.Patch):
+                handle.set_edgecolor(_darken_color(handle.get_facecolor()))
 
 
 def load_results(results_dir: str = "benchmark_results_cocoex") -> pd.DataFrame:
@@ -687,8 +743,8 @@ def plot_operator_usage_distribution(
         palette="Set2",
         linewidth=0.8,
         fliersize=3,
-        linecolor="auto",
     )
+    colorize_boxplot(ax)
     # sns.violinplot(
     #     data=melted,
     #     x="operator_short",
@@ -950,8 +1006,8 @@ def plot_performance_summary(df: pd.DataFrame, output_dir: Path):
         palette="Set2",
         linewidth=0.8,
         fliersize=2,
-        linecolor="auto",
     )
+    colorize_boxplot(ax)
 
     ax.set_xlabel(r"Dimension, $D$")
     ax.set_ylabel(r"Evals./second")
@@ -970,8 +1026,8 @@ def plot_performance_summary(df: pd.DataFrame, output_dir: Path):
         palette="Set2",
         linewidth=0.8,
         fliersize=2,
-        linecolor="auto",
     )
+    colorize_boxplot(ax)
     ax.set_xlabel(r"Dimension, $D$")
     ax.set_ylabel(r"Wall Time, (s)")
     # ax.set_yscale('log')
@@ -1127,8 +1183,8 @@ def plot_weights_by_dimension_boxswarm(
         fliersize=2,
         dodge=True,
         width=0.7,
-        linecolor="auto",
     )
+    colorize_boxplot(ax)
     sns.swarmplot(
         data=melted,
         x="operator_short",
@@ -1190,8 +1246,8 @@ def plot_weights_by_category_boxswarm(
         fliersize=2,
         dodge=True,
         width=0.7,
-        linecolor="auto",
     )
+    colorize_boxplot(ax)
     sns.swarmplot(
         data=melted,
         x="operator_short",
@@ -1253,8 +1309,8 @@ def plot_success_rate_by_dimension_boxswarm(
         fliersize=2,
         dodge=True,
         width=0.7,
-        linecolor="auto",
     )
+    colorize_boxplot(ax)
     sns.swarmplot(
         data=melted,
         x="operator_short",

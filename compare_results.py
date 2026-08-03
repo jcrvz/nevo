@@ -19,6 +19,7 @@ import re
 import warnings
 from pathlib import Path
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
@@ -328,6 +329,60 @@ def ensure_box_spines(ax):
         ax.spines[spine].set_color("black")
 
 
+def _darken_color(rgba, factor=0.65):
+    """Return a darkened RGBA by reducing lightness in HLS space."""
+    import colorsys
+    r, g, b = float(rgba[0]), float(rgba[1]), float(rgba[2])
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    rd, gd, bd = colorsys.hls_to_rgb(h, max(0.0, l * factor), s)
+    return (rd, gd, bd)
+
+
+def colorize_boxplot(ax):
+    """
+    Color box edges, whiskers, caps, and fliers darker than their fill.
+    Median lines are left untouched so they remain visible.
+    Legend handle edges are updated to match.
+    """
+    box_info = []
+    for p in ax.patches:
+        if isinstance(p, mpatches.PathPatch):
+            verts = p.get_path().vertices
+            xmin, xmax = verts[:, 0].min(), verts[:, 0].max()
+            box_width = xmax - xmin
+            fc = p.get_facecolor()
+            dark = _darken_color(fc)
+            p.set_edgecolor(dark)
+            box_info.append((xmin, xmax, box_width, dark))
+
+    for line in ax.lines:
+        xdata = line.get_xdata()
+        if len(xdata) == 0:
+            continue
+        x_mean = float(np.mean(xdata))
+        x_span = float(max(xdata) - min(xdata))
+        has_marker = line.get_marker() not in ("", "None", None)
+
+        for xmin, xmax, box_width, dark in box_info:
+            if xmin - 0.01 <= x_mean <= xmax + 0.01:
+                # Median: no marker, x_span ≈ box_width → skip, keep visible
+                is_median = (not has_marker) and (box_width > 0) and (
+                    abs(x_span - box_width) / box_width < 0.05
+                )
+                if not is_median:
+                    line.set_color(dark)
+                    line.set_markerfacecolor(dark)
+                    line.set_markeredgecolor(dark)
+                break
+
+    # Keep legend handle edges consistent with the darkened box edges
+    legend = ax.get_legend()
+    if legend:
+        for handle in legend.legend_handles:
+            if isinstance(handle, mpatches.Patch):
+                handle.set_edgecolor(_darken_color(handle.get_facecolor()))
+
+
 def experiment_palette(experiments: list[str]) -> dict:
     """Map experiment labels to distinct colours."""
     colors = sns.color_palette("tab10", n_colors=len(experiments))
@@ -365,7 +420,6 @@ def _distplot(ax, *, data, x, y, hue, hue_order, palette, **kwargs):
         sns.boxplot(
             ax=ax, data=data, x=x, y=y,
             hue=hue, hue_order=hue_order, palette=palette,
-            linecolor="auto",
             **kwargs,
         )
 
@@ -451,14 +505,14 @@ def add_performance_metric(df: pd.DataFrame) -> pd.DataFrame:
     if lookup:
         key_cols = ["problem_id", "instance", "dimension"]
         key_cols = [c for c in key_cols if c in df.columns]
-        df["optimum_y"] = df.apply(
+        df["optimal_fitness"] = df.apply(
             lambda r: lookup.get(
                 (int(r["problem_id"]), int(r["instance"]), int(r["dimension"])),
                 float("nan"),
             ),
             axis=1,
         )
-        df["perf"] = (df["best_fitness"] - df["optimum_y"]).clip(lower=0.0)
+        df["perf"] = (df["best_fitness"] - df["optimal_fitness"]).clip(lower=0.0)
         n_solved = (df["perf"] < 1e-6).mean()
         _PERF_COL = "perf"
         _PERF_LABEL = r"$|f(\pmb{x}_\text{best}) - f_*|$"
@@ -518,6 +572,9 @@ def plot_performance_by_dimension(df: pd.DataFrame, output_dir: Path):
     ax.legend(title=None, bbox_to_anchor=(0.0, 1.0), loc="upper left",
               ncol=min(len(exps), 3), frameon=False, columnspacing=0.5, handlelength=0.5)
     ensure_box_spines(ax)
+
+    colorize_boxplot(ax)
+
     plt.tight_layout()
     save_fig(fig, output_dir, "comparison_performance_by_dimension")
 
@@ -554,6 +611,9 @@ def plot_performance_by_category(df: pd.DataFrame, output_dir: Path):
               ncol=min(len(exps), 3), frameon=False, columnspacing=0.5, handlelength=0.5)
     ensure_box_spines(ax)
     ax.set_ylim(top=plot_df["__lp__"].max() * 1.4)
+
+    colorize_boxplot(ax)
+
     plt.tight_layout()
     save_fig(fig, output_dir, "comparison_performance_by_category")
 
@@ -774,6 +834,9 @@ def plot_wall_time(df: pd.DataFrame, output_dir: Path):
     ax.legend(title=None, bbox_to_anchor=(0.0, 0.0), loc="lower left",
               ncol=min(len(exps), 3), frameon=False, columnspacing=0.5, handlelength=0.5)
     ensure_box_spines(ax)
+
+    colorize_boxplot(ax)
+
     plt.tight_layout()
     save_fig(fig, output_dir, "comparison_wall_time")
 
@@ -804,6 +867,9 @@ def plot_evals_per_second(df: pd.DataFrame, output_dir: Path):
     ax.legend(title=None, bbox_to_anchor=(0.0, 1.00), loc="upper left",
               ncol=min(len(exps), 3), frameon=False, columnspacing=0.5, handlelength=0.5)
     ensure_box_spines(ax)
+
+    colorize_boxplot(ax)
+
     plt.tight_layout()
     save_fig(fig, output_dir, "comparison_evals_per_second")
 
@@ -974,7 +1040,7 @@ def print_summary_table(df: pd.DataFrame):
     exps = sorted_experiments(df)
     perf_col = "perf" if "perf" in df.columns else None
     cols = ([perf_col] if perf_col else []) + [
-        "best_fitness", "wall_time", "evals_per_second", "total_evaluations"
+        "wall_time", "evals_per_second", "total_evaluations"
     ]
     avail = [c for c in cols if c in df.columns]
 
@@ -983,7 +1049,18 @@ def print_summary_table(df: pd.DataFrame):
         sub = df[df["experiment"] == exp]
         row = {"Experiment": exp}
         for c in avail:
-            row[c] = sub[c].median()
+            median = sub[c].median()
+            row[c + "-median"] = median
+            #row[c + "-mean"] = sub[c].mean()
+            #row[c + "-std"] = sub[c].std()
+
+            quantile_25 = sub[c].quantile(0.25)
+            quantile_75 = sub[c].quantile(0.75)
+            iqr = quantile_75 - quantile_25
+            row[c + "-iqr"] = iqr
+
+            row[c + "-qcv"] = iqr / median if median != 0 else None
+
         row["n_runs"] = len(sub)
         rows.append(row)
 
