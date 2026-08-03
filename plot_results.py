@@ -687,6 +687,7 @@ def plot_operator_usage_distribution(
         palette="Set2",
         linewidth=0.8,
         fliersize=3,
+        linecolor="auto",
     )
     # sns.violinplot(
     #     data=melted,
@@ -949,6 +950,7 @@ def plot_performance_summary(df: pd.DataFrame, output_dir: Path):
         palette="Set2",
         linewidth=0.8,
         fliersize=2,
+        linecolor="auto",
     )
 
     ax.set_xlabel(r"Dimension, $D$")
@@ -968,6 +970,7 @@ def plot_performance_summary(df: pd.DataFrame, output_dir: Path):
         palette="Set2",
         linewidth=0.8,
         fliersize=2,
+        linecolor="auto",
     )
     ax.set_xlabel(r"Dimension, $D$")
     ax.set_ylabel(r"Wall Time, (s)")
@@ -1124,6 +1127,7 @@ def plot_weights_by_dimension_boxswarm(
         fliersize=2,
         dodge=True,
         width=0.7,
+        linecolor="auto",
     )
     sns.swarmplot(
         data=melted,
@@ -1186,6 +1190,7 @@ def plot_weights_by_category_boxswarm(
         fliersize=2,
         dodge=True,
         width=0.7,
+        linecolor="auto",
     )
     sns.swarmplot(
         data=melted,
@@ -1248,6 +1253,7 @@ def plot_success_rate_by_dimension_boxswarm(
         fliersize=2,
         dodge=True,
         width=0.7,
+        linecolor="auto",
     )
     sns.swarmplot(
         data=melted,

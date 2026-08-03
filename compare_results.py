@@ -365,6 +365,7 @@ def _distplot(ax, *, data, x, y, hue, hue_order, palette, **kwargs):
         sns.boxplot(
             ax=ax, data=data, x=x, y=y,
             hue=hue, hue_order=hue_order, palette=palette,
+            linecolor="auto",
             **kwargs,
         )
 
@@ -460,8 +461,8 @@ def add_performance_metric(df: pd.DataFrame) -> pd.DataFrame:
         df["perf"] = (df["best_fitness"] - df["optimum_y"]).clip(lower=0.0)
         n_solved = (df["perf"] < 1e-6).mean()
         _PERF_COL = "perf"
-        _PERF_LABEL = r"$f(\pmb{x}_\text{best}) - f_*$"
-        _PERF_LOG_LABEL = r"$\log(f(\pmb{x}_\text{best}) - f_*)$"
+        _PERF_LABEL = r"$|f(\pmb{x}_\text{best}) - f_*|$"
+        _PERF_LOG_LABEL = r"$\log(|f(\pmb{x}_\text{best}) - f_*|)$"
         _PERF_LOWER_IS_BETTER = True
         print(
             f"  Performance metric: absolute error f(x)−f* via IOH  "
@@ -645,7 +646,7 @@ def plot_performance_heatmap(df: pd.DataFrame, output_dir: Path):
         annot=True, fmt=".1f", annot_kws={"size": 6},
         linewidths=0.3,
         cbar_ax=cax,
-        cbar_kws={"label": r"median$(\log({\mathrm{perf}}))$"},
+        cbar_kws={"label": r"median$(\log(|f(\pmb{x}_\text{best}) - f_*|)$"},
         square=True,
     )
     ax.set_xlabel("Function ID")
@@ -693,7 +694,7 @@ def plot_summary_heatmap(df: pd.DataFrame, output_dir: Path):
         annot=True, fmt=".1f", annot_kws={"size": 7},
         linewidths=0.4,
         cbar_ax=cax,
-        cbar_kws={"label": r"median$(\log({\mathrm{perf}}))$"},
+        cbar_kws={"label": r"median$(\log(|f(\pmb{x}_\text{best}) - f_*|)$"},
         square=True,
     )
     ax.set_xlabel(r"Dimension, $D$")
@@ -892,7 +893,7 @@ def plot_category_heatmap(df: pd.DataFrame, output_dir: Path):
         linewidths=0.4,
         square=True,
         cbar_ax=cax,
-        cbar_kws={"label": r"median$(\log({\mathrm{perf}}))$"},
+        cbar_kws={"label": r"median$(\log(|f(\pmb{x}_\text{best}) - f_*|)$"},
     )
     ax.set_xlabel("Category")
     ax.set_ylabel("")
