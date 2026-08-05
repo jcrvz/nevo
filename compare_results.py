@@ -433,11 +433,11 @@ def _scatter_perf_vs_walltime(
             fc = group_palette[grp]
             ec = _darken_color(fc)
             ax.scatter(
-                sub[x_col], sub["log_perf"],
+                sub[x_col], sub["perf"],
                 marker=exp_markers[exp],
                 color=fc,
                 edgecolors=ec,
-                s=20, alpha=0.78, linewidths=0.5,
+                s=10, alpha=0.78, linewidths=0.5,
                 zorder=3,
             )
 
@@ -486,13 +486,13 @@ def plot_perf_vs_time_per_eval_by_dimension(df: pd.DataFrame, output_dir: Path):
         df.groupby(["experiment", "dimension", "problem_id"])
         .agg(
             perf_med=("perf", "median"),
-            wall_med=("wall_time", "median"),
+            wall_med=("wall_time_diff", "median"),
             evals_med=("total_evaluations", "median"),
         )
         .reset_index()
     )
     agg["time_per_eval"] = agg["wall_med"] / agg["evals_med"]
-    agg["log_perf"] = _log_perf(agg["perf_med"])
+    agg["perf"] = agg["perf_med"] #_log_perf(agg["perf_med"])
     agg["__grp__"] = agg["dimension"]
     dim_palette_generic = {d: dim_palette[d] for d in dims}
 
@@ -522,8 +522,9 @@ def plot_perf_vs_time_per_eval_by_dimension(df: pd.DataFrame, output_dir: Path):
     )
 
     ax.set_xlabel(r"Median Time per Evaluation (s)")
-    ax.set_ylabel(_PERF_LOG_LABEL)
+    ax.set_ylabel(r"Median " + _PERF_LABEL)
     ax.set_xscale("log")
+    ax.set_yscale("log")
     ensure_box_spines(ax)
     fig.subplots_adjust(left=0.09, right=0.67, top=0.96, bottom=0.16)
     save_fig(fig, output_dir, "comparison_perf_vs_time_per_eval_by_dimension")
@@ -553,13 +554,13 @@ def plot_perf_vs_time_per_eval_by_category(df: pd.DataFrame, output_dir: Path):
         df.groupby(["experiment", "dimension", "problem_id", "category"])
         .agg(
             perf_med=("perf", "median"),
-            wall_med=("wall_time", "median"),
+            wall_med=("wall_time_diff", "median"),
             evals_med=("total_evaluations", "median"),
         )
         .reset_index()
     )
     agg["time_per_eval"] = agg["wall_med"] / agg["evals_med"]
-    agg["log_perf"] = _log_perf(agg["perf_med"])
+    agg["perf"] = agg["perf_med"] #_log_perf(agg["perf_med"])
     agg["__grp__"] = agg["category"]
 
     fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
@@ -588,8 +589,9 @@ def plot_perf_vs_time_per_eval_by_category(df: pd.DataFrame, output_dir: Path):
     )
 
     ax.set_xlabel(r"Median Time per Evaluation (s)")
-    ax.set_ylabel(_PERF_LOG_LABEL)
+    ax.set_ylabel(r"Median " + _PERF_LABEL)
     ax.set_xscale("log")
+    ax.set_yscale("log")
     ensure_box_spines(ax)
     fig.subplots_adjust(left=0.09, right=0.67, top=0.96, bottom=0.16)
     save_fig(fig, output_dir, "comparison_perf_vs_time_per_eval_by_category")
@@ -617,7 +619,7 @@ def plot_perf_vs_walltime_by_dimension(df: pd.DataFrame, output_dir: Path):
         .agg(perf_med=("perf", "median"), wall_med=("wall_time", "median"))
         .reset_index()
     )
-    agg["log_perf"] = _log_perf(agg["perf_med"])
+    agg["perf"] = agg["perf_med"] #_log_perf(agg["perf_med"])
     agg["__grp__"] = agg["dimension"]
     dim_palette_generic = {d: dim_palette[d] for d in dims}
 
@@ -646,8 +648,9 @@ def plot_perf_vs_walltime_by_dimension(df: pd.DataFrame, output_dir: Path):
     )
 
     ax.set_xlabel(r"Median Wall Time (s)")
-    ax.set_ylabel(_PERF_LOG_LABEL)
+    ax.set_ylabel(r"Median " + _PERF_LABEL)
     ax.set_xscale("log")
+    ax.set_yscale("log")
     ensure_box_spines(ax)
     fig.subplots_adjust(left=0.09, right=0.67, top=0.96, bottom=0.16)
     save_fig(fig, output_dir, "comparison_perf_vs_walltime_by_dimension")
@@ -675,7 +678,7 @@ def plot_perf_vs_walltime_by_category(df: pd.DataFrame, output_dir: Path):
         .agg(perf_med=("perf", "median"), wall_med=("wall_time", "median"))
         .reset_index()
     )
-    agg["log_perf"] = _log_perf(agg["perf_med"])
+    agg["perf"] = agg["perf_med"] #_log_perf(agg["perf_med"])
     agg["__grp__"] = agg["category"]
 
     fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
@@ -703,8 +706,9 @@ def plot_perf_vs_walltime_by_category(df: pd.DataFrame, output_dir: Path):
     )
 
     ax.set_xlabel(r"Median Wall Time (s)")
-    ax.set_ylabel(_PERF_LOG_LABEL)
+    ax.set_ylabel(r"Median " + _PERF_LABEL)
     ax.set_xscale("log")
+    ax.set_yscale("log")
     ensure_box_spines(ax)
     fig.subplots_adjust(left=0.09, right=0.67, top=0.96, bottom=0.16)
     save_fig(fig, output_dir, "comparison_perf_vs_walltime_by_category")
@@ -826,14 +830,17 @@ def add_performance_metric(df: pd.DataFrame) -> pd.DataFrame:
             ),
             axis=1,
         )
-        df["perf"] = (df["best_fitness"] - df["optimal_fitness"]).clip(lower=0.0)
+        df["perf"] = (df["best_fitness"] - df["optimal_fitness"]) / (
+            df["optimal_fitness"].abs().clip(lower=1e-10)
+        )
+        df["perf"] = df["perf"].clip(lower=0.0)
         n_solved = (df["perf"] < 1e-6).mean()
         _PERF_COL = "perf"
-        _PERF_LABEL = r"$|f(\pmb{x}_\text{best}) - f_*|$"
-        _PERF_LOG_LABEL = r"$\log(|f(\pmb{x}_\text{best}) - f_*|)$"
+        _PERF_LABEL = r"$(f(\pmb{x}_\text{best}) - f_*) / |f_*|$"
+        _PERF_LOG_LABEL = r"$\log((f(\pmb{x}_\text{best}) - f_*) / |f_*|)$"
         _PERF_LOWER_IS_BETTER = True
         print(
-            f"  Performance metric: absolute error f(x)−f* via IOH  "
+            f"  Performance metric: relative error (f(x)−f*)/|f*| via IOH  "
             f"({n_solved:.1%} of runs solved to within 1e-6)"
         )
         return df
@@ -852,6 +859,54 @@ def add_performance_metric(df: pd.DataFrame) -> pd.DataFrame:
     print("  Performance metric: normalised excess (0=best, 1=worst across experiments)")
     return df
 
+
+def add_wes_metric(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add Wall-Clock Efficiency Score (WES) column to dataframe.
+    
+    WES = exp(-wall_time_diff / total_evaluations) / (1 + perf)
+    
+    where:
+      - perf: solution quality (lower is better)
+      - wall_time: wall-clock time in seconds
+      - total_evaluations: number of objective function evaluations
+    
+    Returns dataframe with new "WES" column (values in [0, 1]).
+    Higher WES indicates better combined solution quality and computational speed.
+    """
+    if "perf" not in df.columns or "wall_time" not in df.columns or \
+       "total_evaluations" not in df.columns:
+        print(f"  Skipping WES: missing columns. Available: {list(df.columns)}")
+        return df
+    
+    # Guard against division issues
+    df = df.copy()
+    time_per_eval = df["wall_time_diff"] / (df["total_evaluations"] + 1e-10)
+    df["WES"] = np.exp(-time_per_eval) / (1.0 + df["perf"])
+    print("  Added WES column: exp(-wall_time_diff / total_evaluations) / (1 + perf)")
+    return df
+
+
+def add_wall_time_diff(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Add wall_time_diff column: difference between each row's wall_time 
+    and the median wall_time for its (experiment, dimension) pair.
+     
+    wall_time_diff = wall_time - median(wall_time per experiment and dimension)
+     
+    Returns dataframe with new "wall_time_diff" column.
+    """
+    if "wall_time" not in df.columns or "experiment" not in df.columns or \
+       "dimension" not in df.columns:
+        print(f"  Skipping wall_time_diff: missing columns.")
+        return df
+      
+    df = df.copy()
+    # median_per_exp_dim = df.groupby(["experiment", "dimension"])["wall_time"].transform("median")
+    median_per_exp_dim = np.median(df["wall_time"])
+    df["wall_time_diff"] = df["wall_time"] - median_per_exp_dim
+    print("  Added wall_time_diff column: wall_time - median(wall_time per experiment, dimension)")
+    return df
 
 # =============================================================================
 # PLOT FUNCTIONS
@@ -936,7 +991,7 @@ def plot_wes_by_dimension(df: pd.DataFrame, output_dir: Path):
     """
     Violin and swarm plots of Wall-Clock Efficiency Score (WES) by dimension.
 
-    WES = 1 / (1 + relative_error * wall_time / total_evaluations)
+    WES = 1 / ((1 + relative_error) * wall_time / total_evaluations)
 
     Higher WES indicates better combined performance and computational efficiency.
 
@@ -953,7 +1008,6 @@ def plot_wes_by_dimension(df: pd.DataFrame, output_dir: Path):
 
     fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
     plot_df = df.copy()
-    plot_df["WES"] = 1 / (1 + plot_df["perf"] * plot_df["wall_time"] / plot_df["total_evaluations"])
 
     _distplot(
         ax, data=plot_df, x="dimension", y="WES",
@@ -962,7 +1016,8 @@ def plot_wes_by_dimension(df: pd.DataFrame, output_dir: Path):
     )
     ax.set_xlabel(r"Dimension, $D$")
     ax.set_ylabel("Wall-Clock Efficiency Score (WES)")
-    ax.set_ylim(0, 1.05)
+    #ax.set_ylim(0, 1.05)
+    ax.set_yscale("log")
     ax.legend(title=None, bbox_to_anchor=(0.0, 1.0), loc="upper left",
               ncol=min(len(exps), 3), frameon=False, columnspacing=0.5, handlelength=0.5)
     ensure_box_spines(ax)
@@ -977,7 +1032,7 @@ def plot_wes_by_category(df: pd.DataFrame, output_dir: Path):
     """
     Violin and swarm plots of Wall-Clock Efficiency Score (WES) by BBOB category.
 
-    WES = 1 / (1 + relative_error * wall_time / total_evaluations)
+    WES = 1 / ((1 + relative_error) * wall_time / total_evaluations)
 
     Higher WES indicates better combined performance and computational efficiency.
 
@@ -988,15 +1043,14 @@ def plot_wes_by_category(df: pd.DataFrame, output_dir: Path):
        "total_evaluations" not in df.columns or "category" not in df.columns:
         print("  Skipping wes_by_category: columns missing.")
         return
-
+ 
     exps = sorted_experiments(df)
     palette = experiment_palette(exps)
     cat_order = [c for c in BBOB_CATEGORIES if c in df["category"].unique()]
-
+ 
     fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
     plot_df = df.copy()
-    plot_df["WES"] = 1 / (1 + plot_df["perf"] * plot_df["wall_time"] / plot_df["total_evaluations"])
-
+ 
     _distplot(
         ax, data=plot_df, x="category", y="WES",
         hue="experiment", hue_order=exps, order=cat_order,
@@ -1005,7 +1059,8 @@ def plot_wes_by_category(df: pd.DataFrame, output_dir: Path):
     )
     ax.set_xlabel("BBOB Category")
     ax.set_ylabel("Wall-Clock Efficiency Score (WES)")
-    ax.set_ylim(0, 1.05)
+    #ax.set_ylim(0, 1.05)
+    ax.set_yscale("log")
     ax.set_xticklabels(ax.get_xticklabels(), ha="center")
     ax.legend(title=None, bbox_to_anchor=(1.0, 1.00), loc="upper right",
               ncol=min(len(exps), 3), frameon=False, columnspacing=0.5, handlelength=0.5)
@@ -1104,7 +1159,7 @@ def plot_performance_heatmap(df: pd.DataFrame, output_dir: Path):
         annot=True, fmt=".1f", annot_kws={"size": 6},
         linewidths=0.3,
         cbar_ax=cax,
-        cbar_kws={"label": r"median$(\log(|f(\pmb{x}_\text{best}) - f_*|)$"},
+        cbar_kws={"label": r"median$(\log(|f(\pmb{x}_\text{best}) - f_*|)/|f_*|$"},
         square=True,
     )
     ax.set_xlabel("Function ID")
@@ -1158,7 +1213,7 @@ def plot_summary_heatmap(df: pd.DataFrame, output_dir: Path):
         annot=True, fmt=".1f", annot_kws={"size": 7},
         linewidths=0.4,
         cbar_ax=cax,
-        cbar_kws={"label": r"median$(\log(|f(\pmb{x}_\text{best}) - f_*|)$"},
+        cbar_kws={"label": r"median$(\log(|f(\pmb{x}_\text{best}) - f_*|/|f_*|)$"},
         square=True,
     )
     ax.set_xlabel(r"Dimension, $D$")
@@ -1370,7 +1425,7 @@ def plot_category_heatmap(df: pd.DataFrame, output_dir: Path):
         linewidths=0.4,
         square=True,
         cbar_ax=cax,
-        cbar_kws={"label": r"median$(\log(|f(\pmb{x}_\text{best}) - f_*|)$"},
+        cbar_kws={"label": r"median$(\log(|f(\pmb{x}_\text{best}) - f_*|/|f_*|)$"},
     )
     ax.set_xlabel("Category")
     ax.set_ylabel("")
@@ -1731,11 +1786,10 @@ def plot_wes_surf(df: pd.DataFrame, output_dir: Path):
        "dimension" not in df.columns:
         print("  Skipping wes_surf: columns missing.")
         return
-     
-    # Compute WES
+      
     plot_df = df.copy()
-    plot_df["WES"] = 1 / (1 + plot_df["perf"] * plot_df["wall_time"] / plot_df["total_evaluations"])
-     
+    plot_df = df.copy()
+      
     # Extract rule and mode from experiment labels
     plot_df["rule"] = plot_df["experiment"].apply(lambda x: _extract_rule_mode(x)[0])
     plot_df["mode"] = plot_df["experiment"].apply(lambda x: _extract_rule_mode(x)[1])
@@ -2189,6 +2243,12 @@ def main():
 
     print("\nSelecting performance metric...")
     df = add_performance_metric(df)
+
+    print("Computing wall_time difference per experiment...")
+    df = add_wall_time_diff(df)
+
+    print("Computing Wall-Clock Efficiency Score (WES)...")
+    df = add_wes_metric(df)
 
     print_summary_table(df)
 
