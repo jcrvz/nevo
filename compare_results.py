@@ -408,12 +408,19 @@ def _scatter_perf_vs_walltime(
     group_col: str,
     group_palette: dict,
     group_title: str,
+    x_col: str = "wall_med",
 ):
     """
-    Core scatter logic shared by the two perf-vs-walltime plots.
-    *agg* must contain columns: experiment, wall_med, log_perf, <group_col>.
+    Core scatter logic shared by the perf-vs-walltime plots.
+    *agg* must contain columns: experiment, log_perf, <group_col>, and x_col.
     Markers encode experiment; colours encode group_col.
     Returns (marker_handles, colour_handles) for legend construction.
+    
+    Parameters
+    ----------
+    x_col : str
+        Column name to use for x-axis (default: "wall_med" for wall time,
+        can also be "time_per_eval" for efficiency).
     """
     exp_markers = {exp: _SCATTER_MARKERS[i % len(_SCATTER_MARKERS)] for i, exp in enumerate(exps)}
     groups = [g for g in group_palette if g in agg[group_col].unique()]
@@ -426,7 +433,7 @@ def _scatter_perf_vs_walltime(
             fc = group_palette[grp]
             ec = _darken_color(fc)
             ax.scatter(
-                sub["wall_med"], sub["log_perf"],
+                sub[x_col], sub["log_perf"],
                 marker=exp_markers[exp],
                 color=fc,
                 edgecolors=ec,
@@ -451,6 +458,141 @@ def _scatter_perf_vs_walltime(
         for g in groups
     ]
     return marker_handles, colour_handles
+
+
+
+def plot_perf_vs_time_per_eval_by_dimension(df: pd.DataFrame, output_dir: Path):
+    """
+    Scatter plot: median performance (error) vs median time per evaluation.
+    Each point = median over all instances of one (experiment, dimension, problem_id) triple.
+    Marker shape encodes experiment; fill colour encodes problem dimension.
+
+    Time per evaluation = wall_time / total_evaluations (seconds per evaluation).
+    Lower values indicate more efficient algorithms.
+
+    Caption: Performance–efficiency trade-off. Each point summarises one (configuration,
+    dimension, function) triple (median over instances). Lower-left is ideal
+    (better performance, faster per-evaluation speed).
+    """
+    if "perf" not in df.columns or "wall_time" not in df.columns or "total_evaluations" not in df.columns:
+        print("  Skipping perf_vs_time_per_eval_by_dimension: columns missing.")
+        return
+
+    exps = sorted_experiments(df)
+    dims = sorted(df["dimension"].unique())
+    dim_palette = dict(zip(dims, sns.color_palette("Set2", n_colors=len(dims))))
+
+    agg = (
+        df.groupby(["experiment", "dimension", "problem_id"])
+        .agg(
+            perf_med=("perf", "median"),
+            wall_med=("wall_time", "median"),
+            evals_med=("total_evaluations", "median"),
+        )
+        .reset_index()
+    )
+    agg["time_per_eval"] = agg["wall_med"] / agg["evals_med"]
+    agg["log_perf"] = _log_perf(agg["perf_med"])
+    agg["__grp__"] = agg["dimension"]
+    dim_palette_generic = {d: dim_palette[d] for d in dims}
+
+    fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
+
+    marker_handles, colour_handles = _scatter_perf_vs_walltime(
+        ax, agg, exps=exps,
+        group_col="__grp__", group_palette=dim_palette_generic,
+        group_title=r"$D$",
+        x_col="time_per_eval",
+    )
+
+    leg1 = ax.legend(
+        handles=marker_handles, title="Implementation",
+        bbox_to_anchor=(1.0, 1.0), loc="upper left",
+        frameon=False, fontsize=7, title_fontsize=7, ncol=1,
+        alignment="left",
+        handlelength=0.8, borderpad=0.5,
+    )
+    ax.add_artist(leg1)
+    ax.legend(
+        handles=colour_handles, title=r"Dimensionality",
+        bbox_to_anchor=(1.0, 0.0), loc="lower left",
+        alignment="left",
+        frameon=False, fontsize=7, title_fontsize=7, ncol=2,
+        handlelength=0.5, borderpad=0.1,
+    )
+
+    ax.set_xlabel(r"Median Time per Evaluation (s)")
+    ax.set_ylabel(_PERF_LOG_LABEL)
+    ax.set_xscale("log")
+    ensure_box_spines(ax)
+    fig.subplots_adjust(left=0.09, right=0.67, top=0.96, bottom=0.16)
+    save_fig(fig, output_dir, "comparison_perf_vs_time_per_eval_by_dimension")
+
+
+def plot_perf_vs_time_per_eval_by_category(df: pd.DataFrame, output_dir: Path):
+    """
+    Scatter plot: median performance (error) vs median time per evaluation.
+    Each point = median over all instances of one (experiment, dimension, problem_id) triple.
+    Marker shape encodes experiment; fill colour encodes BBOB function category.
+
+    Time per evaluation = wall_time / total_evaluations (seconds per evaluation).
+    Lower values indicate more efficient algorithms.
+
+    Caption: Performance–efficiency trade-off coloured by BBOB category. Reveals which
+    problem structures drive the perf/efficiency relationship for each configuration.
+    """
+    if "perf" not in df.columns or "wall_time" not in df.columns or "total_evaluations" not in df.columns or "category" not in df.columns:
+        print("  Skipping perf_vs_time_per_eval_by_category: columns missing.")
+        return
+
+    exps = sorted_experiments(df)
+    cats = [c for c in BBOB_CATEGORIES if c in df["category"].unique()]
+    cat_palette = dict(zip(cats, sns.color_palette("Set2", n_colors=len(cats))))
+
+    agg = (
+        df.groupby(["experiment", "dimension", "problem_id", "category"])
+        .agg(
+            perf_med=("perf", "median"),
+            wall_med=("wall_time", "median"),
+            evals_med=("total_evaluations", "median"),
+        )
+        .reset_index()
+    )
+    agg["time_per_eval"] = agg["wall_med"] / agg["evals_med"]
+    agg["log_perf"] = _log_perf(agg["perf_med"])
+    agg["__grp__"] = agg["category"]
+
+    fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
+
+    marker_handles, colour_handles = _scatter_perf_vs_walltime(
+        ax, agg, exps=exps,
+        group_col="__grp__", group_palette=cat_palette,
+        group_title="Category",
+        x_col="time_per_eval",
+    )
+
+    leg1 = ax.legend(
+        handles=marker_handles, title="Implementation",
+        bbox_to_anchor=(1.0, 1.0), loc="upper left",
+        alignment="left",
+        frameon=False, fontsize=7, title_fontsize=7, ncol=1,
+        handlelength=0.8, borderpad=0.5,
+    )
+    ax.add_artist(leg1)
+    ax.legend(
+        handles=colour_handles, title="Category",
+        bbox_to_anchor=(1.0, 0.0), loc="lower left",
+        alignment="left",
+        frameon=False, fontsize=7, title_fontsize=7, ncol=2,
+        handlelength=0.5, borderpad=0.1, columnspacing=1.0,
+    )
+
+    ax.set_xlabel(r"Median Time per Evaluation (s)")
+    ax.set_ylabel(_PERF_LOG_LABEL)
+    ax.set_xscale("log")
+    ensure_box_spines(ax)
+    fig.subplots_adjust(left=0.09, right=0.67, top=0.96, bottom=0.16)
+    save_fig(fig, output_dir, "comparison_perf_vs_time_per_eval_by_category")
 
 
 def plot_perf_vs_walltime_by_dimension(df: pd.DataFrame, output_dir: Path):
@@ -916,7 +1058,13 @@ def plot_summary_heatmap(df: pd.DataFrame, output_dir: Path):
         .reindex(exps)
     )
 
-    fig, ax = plt.subplots(figsize=(SINGLE_COL_WIDTH, 0.55 * len(exps) + 0.6))
+    # Compute figsize: cell size ≈ 0.35 inches (square), plus margins for labels/colorbar
+    cell_size_in = 0.35
+    n_rows, n_cols = len(pivot), len(pivot.columns)
+    fig_w = n_cols * cell_size_in + 1.2  # Add space for labels and colorbar
+    fig_h = n_rows * cell_size_in + 0.8  # Add space for title and labels
+    
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="4%", pad=0.15)
@@ -931,6 +1079,7 @@ def plot_summary_heatmap(df: pd.DataFrame, output_dir: Path):
     )
     ax.set_xlabel(r"Dimension, $D$")
     ax.set_ylabel("")
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=0, ha="center", fontsize=7)
     ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
     ensure_box_spines(ax)
     plt.tight_layout()
@@ -1120,7 +1269,13 @@ def plot_category_heatmap(df: pd.DataFrame, output_dir: Path):
         .reindex(exps)[cat_order]
     )
 
-    fig, ax = plt.subplots(figsize=(SINGLE_COL_WIDTH, 0.55 * len(exps) + 0.6))
+    # Compute figsize: cell size ≈ 0.35 inches (square), plus margins for labels/colorbar
+    cell_size_in = 0.35
+    n_rows, n_cols = len(pivot), len(pivot.columns)
+    fig_w = n_cols * cell_size_in + 1.2  # Add space for labels and colorbar
+    fig_h = n_rows * cell_size_in + 0.8  # Add space for title and labels
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
 
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="4%", pad=0.15)
@@ -1142,14 +1297,63 @@ def plot_category_heatmap(df: pd.DataFrame, output_dir: Path):
     save_fig(fig, output_dir, "comparison_category_heatmap")
 
 
+def _operator_entropy(probs: np.ndarray) -> float:
+    """Shannon entropy (bits) of a probability distribution. Zeros are ignored."""
+    p = probs[probs > 0]
+    return float(-np.sum(p * np.log2(p))) if len(p) > 0 else 0.0
+
+
+def _entropy_pivot(
+    df: pd.DataFrame,
+    exps: list[str],
+    group_col: str,
+    group_vals,
+    op_cols: list[str],
+) -> pd.DataFrame:
+    """
+    Build a (experiment × group_val) pivot of operator Shannon entropy (bits).
+
+    For each cell the operator counts are averaged over all rows in the subset,
+    then normalised to a probability distribution before computing entropy.
+    """
+    records = []
+    for exp in exps:
+        for gval in group_vals:
+            sub = df[(df["experiment"] == exp) & (df[group_col] == gval)]
+            if sub.empty or not any(sub[c].notna().any() for c in op_cols):
+                records.append({"experiment": exp, group_col: gval, "entropy": np.nan})
+                continue
+            means = np.array([sub[c].mean() for c in op_cols], dtype=float)
+            means = np.nan_to_num(means, nan=0.0)
+            total = means.sum()
+            if total == 0:
+                records.append({"experiment": exp, group_col: gval, "entropy": 0.0})
+                continue
+            records.append({
+                "experiment": exp,
+                group_col: gval,
+                "entropy": _operator_entropy(means / total),
+            })
+    return (
+        pd.DataFrame(records)
+        .pivot(index="experiment", columns=group_col, values="entropy")
+        .reindex(exps)
+    )
+
+
 def plot_operator_mode_breakdown(df: pd.DataFrame, output_dir: Path):
     """
-    Stacked bar of mean operator usage fractions per experiment.
+    Two-column figure: left panel shows the stacked operator usage fractions
+    per experiment; right panel shows Shannon entropy of operator usage.
+    Both panels share the same y-axis for experiment names. The legend from
+    the left panel covers operator colors.
 
     Only experiments that carry ``op_count_*`` columns are included.
 
-    Caption: Mean operator usage fraction per experiment. Bars sum to 1. Only
-    configurations with operator-count data are shown.
+    Caption: (Left) Mean operator usage fraction per experiment. Bars sum to 1.
+    (Right) Shannon entropy of the operator usage distribution per experiment —
+    higher values indicate more diverse operator selection.
+    Only configurations with operator-count data are shown.
     """
     op_cols = [c for c in df.columns if c.startswith("op_count_")]
     if not op_cols:
@@ -1183,28 +1387,351 @@ def plot_operator_mode_breakdown(df: pd.DataFrame, output_dir: Path):
     # Normalise to fractions
     op_pivot = op_pivot.div(op_pivot.sum(axis=1), axis=0)
 
-    fig, ax = plt.subplots(
-        figsize=(max(SINGLE_COL_WIDTH, 0.8 * len(valid_exps)), 2.8)
-    )
+    # Shannon entropy per experiment
+    entropies = [
+        _operator_entropy(op_pivot.loc[exp].values) for exp in valid_exps
+    ]
+
+    y = np.arange(len(valid_exps))
     colors = sns.color_palette("tab20", n_colors=len(op_pivot.columns))
-    op_pivot.plot(
-        kind="bar", stacked=True, ax=ax,
-        color=colors, edgecolor="black", linewidth=0.3, width=0.6,
+    fig_w = max(DOUBLE_COL_WIDTH, 4.5)
+    fig_h = max(2.8, 0.35 * len(valid_exps) + 0.6)
+
+    fig, (ax_left, ax_right) = plt.subplots(
+        1, 2,
+        figsize=(fig_w, fig_h),
+        sharey=True,
+        gridspec_kw={"width_ratios": [0.6, 0.2], "wspace": 0.05},
     )
-    ax.set_xlabel("")
-    ax.set_ylabel("Operator usage fraction")
-    ax.set_ylim(0, 1.05)
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=30, ha="right")
-    ax.legend(title="Operator", bbox_to_anchor=(1.02, 1), loc="upper left",
-              ncol=1, fontsize=6, frameon=False)
-    ensure_box_spines(ax)
+
+    # ── Left: stacked operator fractions (horizontal bars) ──────────────────
+    bottom = np.zeros(len(valid_exps))
+    for i, col in enumerate(op_pivot.columns):
+        vals = op_pivot[col].values
+        ax_left.barh(y, vals, left=bottom, color=colors[i],
+                     edgecolor="black", linewidth=0.3, height=0.6, label=col)
+        bottom += vals
+    ax_left.set_yticks(y)
+    ax_left.set_yticklabels(valid_exps)
+    ax_left.set_xlabel("Operator usage fraction")
+    ax_left.set_xlim(0, 1.05)
+    legend = ax_left.legend(
+        title="Operator", bbox_to_anchor=(0.95, 0.0),
+        loc="lower right", ncol=1, fontsize=6, frameon=True,
+        framealpha=0.8,
+    )
+    legend.get_frame().set_linewidth(0.5)
+    ensure_box_spines(ax_left)
+
+    # ── Right: entropy bar chart ──────────────────────────────────────────
+    exp_palette = experiment_palette(valid_exps)
+    bar_colors = [exp_palette[e] for e in valid_exps]
+    ax_right.barh(y, entropies, color=bar_colors, edgecolor="black", linewidth=0.4,
+                  height=0.6)
+    w_max = max(entropies) if entropies else 1.0
+    for yi, H in zip(y, entropies):
+        ax_right.text(H + 0.03 * w_max, yi, f"{H:.2f}",
+                      ha="left", va="center", fontsize=6)
+    ax_right.set_xlabel(r"Entropy (bits)")
+    ax_right.set_xlim(0, w_max * 1.35)
+    ax_right.tick_params(left=False)
+    ensure_box_spines(ax_right)
+
     plt.tight_layout()
     save_fig(fig, output_dir, "comparison_operator_breakdown")
 
 
-# =============================================================================
-# SUMMARY TABLE
-# =============================================================================
+def plot_entropy_heatmap(df: pd.DataFrame, output_dir: Path):
+    """
+    Heatmap: experiment (rows) × problem_id (columns) — operator Shannon entropy.
+
+    For each cell the operator counts are averaged over all runs in that
+    (experiment, function) subset, normalised to a probability distribution,
+    and the Shannon entropy (bits) is computed.  Higher entropy = more
+    diverse operator usage.
+
+    Caption: Operator selection entropy (bits) per BBOB function and
+    experiment, averaged over all dimensions and instances.  Higher values
+    indicate more balanced use of the operator repertoire.
+    """
+    op_cols = [c for c in df.columns if c.startswith("op_count_")]
+    if not op_cols:
+        print("  Skipping entropy_heatmap: no op_count columns.")
+        return
+
+    exps = sorted_experiments(df)
+    func_ids = sorted(df["problem_id"].unique())
+
+    pivot = _entropy_pivot(df, exps, "problem_id", func_ids, op_cols)
+    h_max = np.nanmax(pivot.values) if not np.all(np.isnan(pivot.values)) else 1.0
+
+    fig, ax = plt.subplots(figsize=(DOUBLE_COL_WIDTH, 0.55 * len(exps) + 0.6))
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="4%", pad=0.15)
+
+    sns.heatmap(
+        pivot, ax=ax, cmap="YlGnBu",
+        annot=True, fmt=".2f", annot_kws={"size": 6},
+        linewidths=0.3,
+        vmin=0, vmax=h_max,
+        cbar_ax=cax,
+        cbar_kws={"label": r"Entropy $H$ (bits)"},
+        square=True,
+    )
+    ax.set_xlabel("Function ID")
+    ax.set_ylabel("")
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
+    ensure_box_spines(ax)
+    plt.tight_layout()
+    save_fig(fig, output_dir, "comparison_entropy_heatmap")
+
+
+def plot_entropy_summary_heatmap(df: pd.DataFrame, output_dir: Path):
+    """
+    Heatmap: experiment (rows) × dimension (columns) — operator Shannon entropy.
+
+    Caption: Operator selection entropy (bits) by experiment and problem
+    dimension.  Higher entropy indicates more balanced use of the operator
+    repertoire at that dimensionality.
+    """
+    op_cols = [c for c in df.columns if c.startswith("op_count_")]
+    if not op_cols:
+        print("  Skipping entropy_summary_heatmap: no op_count columns.")
+        return
+
+    exps = sorted_experiments(df)
+    dims = sorted(df["dimension"].unique())
+
+    pivot = _entropy_pivot(df, exps, "dimension", dims, op_cols)
+    h_max = np.nanmax(pivot.values) if not np.all(np.isnan(pivot.values)) else 1.0
+
+    # Compute figsize: cell size ≈ 0.35 inches (square), plus margins for labels/colorbar
+    cell_size_in = 0.35
+    n_rows, n_cols = len(pivot), len(pivot.columns)
+    fig_w = n_cols * cell_size_in + 1.2  # Add space for labels and colorbar
+    fig_h = n_rows * cell_size_in + 0.8  # Add space for title and labels
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="4%", pad=0.15)
+
+    sns.heatmap(
+        pivot, ax=ax, cmap="YlGnBu",
+        annot=True, fmt=".2f", annot_kws={"size": 7},
+        linewidths=0.4,
+        vmin=0, vmax=h_max,
+        cbar_ax=cax,
+        cbar_kws={"label": r"Entropy $H$ (bits)"},
+        square=True,
+    )
+    ax.set_xlabel(r"Dimension, $D$")
+    ax.set_ylabel("")
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
+    ensure_box_spines(ax)
+    plt.tight_layout()
+    save_fig(fig, output_dir, "comparison_entropy_summary_heatmap")
+
+
+def plot_entropy_category_heatmap(df: pd.DataFrame, output_dir: Path):
+    """
+    Heatmap: experiment (rows) × BBOB category (columns) — operator Shannon entropy.
+
+    Caption: Operator selection entropy (bits) per BBOB category and
+    experiment, averaged across all dimensions and instances.  Reveals which
+    configurations diversify their operator use on specific problem types.
+    """
+    op_cols = [c for c in df.columns if c.startswith("op_count_")]
+    if not op_cols or "category" not in df.columns:
+        print("  Skipping entropy_category_heatmap: column missing.")
+        return
+
+    exps = sorted_experiments(df)
+    cat_order = [c for c in BBOB_CATEGORIES if c in df["category"].unique()]
+
+    pivot = _entropy_pivot(df, exps, "category", cat_order, op_cols)[cat_order]
+    h_max = np.nanmax(pivot.values) if not np.all(np.isnan(pivot.values)) else 1.0
+
+    # Compute figsize: cell size ≈ 0.35 inches (square), plus margins for labels/colorbar
+    cell_size_in = 0.35
+    n_rows, n_cols = len(pivot), len(pivot.columns)
+    fig_w = n_cols * cell_size_in + 1.2  # Add space for labels and colorbar
+    fig_h = n_rows * cell_size_in + 0.8  # Add space for title and labels
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="4%", pad=0.15)
+
+    sns.heatmap(
+        pivot, ax=ax, cmap="YlGnBu",
+        annot=True, fmt=".2f", annot_kws={"size": 7},
+        linewidths=0.4,
+        vmin=0, vmax=h_max,
+        square=True,
+        cbar_ax=cax,
+        cbar_kws={"label": r"Entropy $H$ (bits)"},
+    )
+    ax.set_xlabel("Category")
+    ax.set_ylabel("")
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=0, ha="center", fontsize=7)
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0, ha="right")
+    ensure_box_spines(ax)
+    plt.tight_layout()
+    save_fig(fig, output_dir, "comparison_entropy_category_heatmap")
+
+
+def plot_perf_vs_time_per_eval(df: pd.DataFrame, output_dir: Path):
+    """
+    Faceted scatter plot with KDE contours: rows=experiments, columns=dimensions.
+     
+    Each subplot shows the relationship between performance (log scale, y-axis)
+    and time per evaluation (log scale, x-axis), with points coloured by BBOB 
+    category. KDE contours show the approximate density distribution per category.
+     
+    This eliminates double-encoding: experiments on rows, dimensions on columns,
+    categories via colours.
+     
+    Caption: Performance–efficiency landscape across experiments and problem
+    dimensions. Each cell shows all runs for that (experiment, dimension) pair,
+    coloured by BBOB category. KDE contours reveal problem-structure clustering.
+    """
+    if "perf" not in df.columns or "wall_time" not in df.columns or \
+       "total_evaluations" not in df.columns or "category" not in df.columns or \
+       "dimension" not in df.columns:
+        print("  Skipping perf_vs_time_per_eval: columns missing.")
+        return
+
+    # Prepare data
+    plot_df = df.copy()
+    plot_df["time_per_eval"] = plot_df["wall_time"] / plot_df["total_evaluations"]
+    plot_df["log_perf"] = _log_perf(plot_df["perf"])
+     
+    exps = sorted_experiments(plot_df)
+    dims = sorted(plot_df["dimension"].unique())
+    cats = [c for c in BBOB_CATEGORIES if c in plot_df["category"].unique()]
+     
+    # Prepare category colour palette
+    cat_palette = dict(zip(cats, sns.color_palette("Set2", n_colors=len(cats))))
+     
+    # Create facet grid
+    n_exp = len(exps)
+    n_dim = len(dims)
+    fig_w = max(DOUBLE_COL_WIDTH, n_dim * 2.0)
+    fig_h = max(3.0, n_exp * 2.2)
+     
+    fig, axes = plt.subplots(n_exp, n_dim, figsize=(fig_w, fig_h), 
+                             sharex=True, sharey=True)
+     
+    # Ensure axes is 2D even for single row/column
+    if n_exp == 1:
+        axes = axes.reshape(1, -1)
+    if n_dim == 1:
+        axes = axes.reshape(-1, 1)
+     
+    # Plot each cell
+    for i, exp in enumerate(exps):
+        for j, dim in enumerate(dims):
+            ax = axes[i, j]
+             
+            # Filter data for this cell
+            cell_data = plot_df[(plot_df["experiment"] == exp) & 
+                                (plot_df["dimension"] == dim)]
+             
+            if cell_data.empty:
+                ax.text(0.5, 0.5, "No data", ha="center", va="center",
+                       transform=ax.transAxes, fontsize=8, color="gray")
+                continue
+             
+            # Plot scatter points, one per category
+            for cat in cats:
+                cat_data = cell_data[cell_data["category"] == cat]
+                if not cat_data.empty:
+                    ax.scatter(
+                        cat_data["time_per_eval"], cat_data["log_perf"],
+                        color=cat_palette[cat], label=cat,
+                        s=15, alpha=0.5, edgecolors="none", zorder=2,
+                    )
+             
+            # Add KDE contours for each category
+            for cat in cats:
+                cat_data = cell_data[cell_data["category"] == cat]
+                if len(cat_data) >= 3:  # Need at least 3 points for KDE
+                    try:
+                        x = np.log10(cat_data["time_per_eval"] + 1e-10)
+                        y = cat_data["log_perf"].values
+                         
+                        # Skip if too few unique values
+                        if len(np.unique(x)) < 2 or len(np.unique(y)) < 2:
+                            continue
+                         
+                        from scipy.stats import gaussian_kde
+                         
+                        # Create 2D KDE
+                        xy = np.vstack([x, y])
+                        try:
+                            kde = gaussian_kde(xy, bw_method=0.25)
+                             
+                            # Create grid for contours
+                            x_min, x_max = x.min() - 0.5, x.max() + 0.5
+                            y_min, y_max = y.min() - 0.5, y.max() + 0.5
+                            xx, yy = np.meshgrid(
+                                np.linspace(x_min, x_max, 30),
+                                np.linspace(y_min, y_max, 30),
+                            )
+                            positions = np.vstack([xx.ravel(), yy.ravel()])
+                            zz = kde(positions).reshape(xx.shape)
+                             
+                            # Plot contours
+                            ax.contour(
+                                10**xx, yy, zz, levels=2,
+                                colors=cat_palette[cat], alpha=0.4,
+                                linewidths=0.8,
+                            )
+                        except (np.linalg.LinAlgError, ValueError):
+                            pass  # Skip KDE if singular or other error
+                    except ImportError:
+                        pass  # scipy not available
+             
+            ax.set_xscale("log")
+            ensure_box_spines(ax)
+             
+            # Column labels (dimensions)
+            if i == 0:
+                ax.set_title(f"$D = {dim}$", fontsize=8, fontweight="bold")
+             
+            # Row labels (experiments)
+            if j == 0:
+                ax.set_ylabel(exp, fontsize=8, fontweight="bold")
+            else:
+                ax.set_ylabel("")
+             
+            # Axis labels only on edges
+            if i == n_exp - 1:
+                ax.set_xlabel(r"Time/Eval (s)", fontsize=7)
+            else:
+                ax.set_xlabel("")
+             
+            if j > 0:
+                ax.set_ylabel("")
+     
+    # Create shared legend for categories (bottom of figure)
+    handles = [
+        mpatches.Patch(facecolor=cat_palette[c], label=c, edgecolor="black", linewidth=0.5)
+        for c in cats
+    ]
+    fig.legend(
+        handles, cats, title="Category",
+        bbox_to_anchor=(0.5, -0.02), loc="upper center",
+        ncol=len(cats), frameon=False, fontsize=7, title_fontsize=7,
+    )
+     
+    # Set shared y-label
+    fig.text(0.02, 0.5, _PERF_LOG_LABEL, va="center", rotation="vertical",
+             fontsize=8, fontweight="bold")
+     
+    plt.tight_layout(rect=[0.04, 0.05, 1, 1])
+    save_fig(fig, output_dir, "comparison_perf_vs_time_per_eval_facet")
+
+
 
 
 def print_summary_table(df: pd.DataFrame):
@@ -1339,9 +1866,15 @@ def main():
     plot_timing_summary(df, output_dir)
     plot_perf_vs_walltime_by_dimension(df, output_dir)
     plot_perf_vs_walltime_by_category(df, output_dir)
+    plot_perf_vs_time_per_eval_by_dimension(df, output_dir)
+    plot_perf_vs_time_per_eval_by_category(df, output_dir)
+    # plot_perf_vs_time_per_eval(df, output_dir)
 
     if not args.no_operator_breakdown:
         plot_operator_mode_breakdown(df, output_dir)
+        plot_entropy_heatmap(df, output_dir)
+        plot_entropy_summary_heatmap(df, output_dir)
+        plot_entropy_category_heatmap(df, output_dir)
 
     print(f"\n{'=' * 60}")
     print(f"Done! Figures saved to: {output_dir}")
