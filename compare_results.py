@@ -710,7 +710,7 @@ def plot_perf_vs_walltime_by_category(df: pd.DataFrame, output_dir: Path):
     save_fig(fig, output_dir, "comparison_perf_vs_walltime_by_category")
 
 
-def _distplot(ax, *, data, x, y, hue, hue_order, palette, **kwargs):
+def _distplot(ax, *, data, x, y, hue, hue_order, palette, force_violin=False, **kwargs):
     """
     Draw either a violin plot or a box plot depending on the ``_USE_VIOLIN`` flag.
 
@@ -718,7 +718,7 @@ def _distplot(ax, *, data, x, y, hue, hue_order, palette, **kwargs):
     and box-specific defaults are applied automatically so callers don't need
     to branch.
     """
-    if _USE_VIOLIN:
+    if _USE_VIOLIN or force_violin:
         # Strip box-only kwargs and add violin defaults
         kwargs.pop("fliersize", None)
         kwargs.setdefault("inner", "box")
@@ -931,6 +931,90 @@ def plot_performance_by_category(df: pd.DataFrame, output_dir: Path):
     plt.tight_layout()
     save_fig(fig, output_dir, "comparison_performance_by_category")
 
+
+def plot_wes_by_dimension(df: pd.DataFrame, output_dir: Path):
+    """
+    Violin and swarm plots of Wall-Clock Efficiency Score (WES) by dimension.
+
+    WES = 1 / (1 + relative_error * wall_time / total_evaluations)
+
+    Higher WES indicates better combined performance and computational efficiency.
+
+    Caption: Distribution of Wall-Clock Efficiency Score per problem dimension.
+    WES combines solution quality and wall-clock speed into a single metric
+    (higher is better). Each experiment shown with different colours.
+    """
+    if "perf" not in df.columns or "wall_time" not in df.columns or "total_evaluations" not in df.columns:
+        print("  Skipping wes_by_dimension: columns missing.")
+        return
+
+    exps = sorted_experiments(df)
+    palette = experiment_palette(exps)
+
+    fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
+    plot_df = df.copy()
+    plot_df["WES"] = 1 / (1 + plot_df["perf"] * plot_df["wall_time"] / plot_df["total_evaluations"])
+
+    _distplot(
+        ax, data=plot_df, x="dimension", y="WES",
+        hue="experiment", hue_order=exps, palette=palette,
+        force_violin=False,
+    )
+    ax.set_xlabel(r"Dimension, $D$")
+    ax.set_ylabel("Wall-Clock Efficiency Score (WES)")
+    ax.set_ylim(0, 1.05)
+    ax.legend(title=None, bbox_to_anchor=(0.0, 1.0), loc="upper left",
+              ncol=min(len(exps), 3), frameon=False, columnspacing=0.5, handlelength=0.5)
+    ensure_box_spines(ax)
+
+    colorize_boxplot(ax)
+
+    plt.tight_layout()
+    save_fig(fig, output_dir, "comparison_wes_by_dimension")
+
+
+def plot_wes_by_category(df: pd.DataFrame, output_dir: Path):
+    """
+    Violin and swarm plots of Wall-Clock Efficiency Score (WES) by BBOB category.
+
+    WES = 1 / (1 + relative_error * wall_time / total_evaluations)
+
+    Higher WES indicates better combined performance and computational efficiency.
+
+    Caption: Distribution of Wall-Clock Efficiency Score per BBOB category.
+    Reveals which problem types each configuration handles most efficiently.
+    """
+    if "perf" not in df.columns or "wall_time" not in df.columns or \
+       "total_evaluations" not in df.columns or "category" not in df.columns:
+        print("  Skipping wes_by_category: columns missing.")
+        return
+
+    exps = sorted_experiments(df)
+    palette = experiment_palette(exps)
+    cat_order = [c for c in BBOB_CATEGORIES if c in df["category"].unique()]
+
+    fig, ax = plt.subplots(figsize=FIGSIZE_DOUBLE)
+    plot_df = df.copy()
+    plot_df["WES"] = 1 / (1 + plot_df["perf"] * plot_df["wall_time"] / plot_df["total_evaluations"])
+
+    _distplot(
+        ax, data=plot_df, x="category", y="WES",
+        hue="experiment", hue_order=exps, order=cat_order,
+        palette=palette,
+        force_violin=False,
+    )
+    ax.set_xlabel("BBOB Category")
+    ax.set_ylabel("Wall-Clock Efficiency Score (WES)")
+    ax.set_ylim(0, 1.05)
+    ax.set_xticklabels(ax.get_xticklabels(), ha="center")
+    ax.legend(title=None, bbox_to_anchor=(1.0, 1.00), loc="upper right",
+              ncol=min(len(exps), 3), frameon=False, columnspacing=0.5, handlelength=0.5)
+    ensure_box_spines(ax)
+
+    colorize_boxplot(ax)
+
+    plt.tight_layout()
+    save_fig(fig, output_dir, "comparison_wes_by_category")
 
 def plot_dimension_scaling(df: pd.DataFrame, output_dir: Path):
     """
@@ -1579,6 +1663,262 @@ def plot_entropy_category_heatmap(df: pd.DataFrame, output_dir: Path):
     save_fig(fig, output_dir, "comparison_entropy_category_heatmap")
 
 
+def _extract_rule_mode(exp_label: str) -> tuple:
+    """
+    Parse experiment label to extract learning rule and operator mode.
+      
+    Expected format: "RULE+MODE" or "RULE / MODE"
+    where RULE ∈ {td0, td_lambda, eps_greedy} and MODE ∈ {trad, nm_dual, nm_softmix}
+      
+    Returns (rule, mode) or (None, None) if parse fails.
+    """
+    # Try to split by + or /
+    sep = None
+    if "+" in exp_label:
+        sep = "+"
+    elif "/" in exp_label:
+        sep = "/"
+    else:
+        return None, None
+      
+    parts = exp_label.split(sep)
+    if len(parts) != 2:
+        return None, None
+      
+    rule_raw, mode_raw = [p.strip() for p in parts]
+      
+    # Normalize rule
+    rule = None
+    if "TD(0)" in rule_raw or "td0" in rule_raw.lower():
+        rule = "td0"
+    elif "λ" in rule_raw or "td_lambda" in rule_raw.lower() or "TD(lam" in rule_raw or "lambda" in rule_raw.lower():
+        rule = "td_lambda"
+    elif "ε" in rule_raw or "eps" in rule_raw.lower():
+        rule = "eps_greedy"
+      
+    # Normalize mode
+    mode = None
+    if "trad" in mode_raw.lower():
+        mode = "trad"
+    elif "dual" in mode_raw.lower():
+        mode = "nm_dual"
+    elif "softmix" in mode_raw.lower():
+        mode = "nm_softmix"
+      
+    return rule, mode
+
+
+
+def plot_wes_surf(df: pd.DataFrame, output_dir: Path):
+    """
+    Faceted heatmap surface: rows=operator modes, columns=learning rules.
+     
+    Each subplot shows WES values as a 2D heatmap:
+      X-axis: Dimension (D)
+      Y-axis: Problem function ID
+      Colour: Median WES (higher = better)
+     
+    This provides a comprehensive view of efficiency across the parameter space
+    (rule × mode × dimension × function_id).
+     
+    Caption: Wall-Clock Efficiency Score surfaces across operator modes and
+    learning rules. Higher colour intensity indicates better combined performance
+    and computational speed. Rows represent operator modes; columns represent
+    learning rule strategies.
+    """
+    if "perf" not in df.columns or "wall_time" not in df.columns or \
+       "total_evaluations" not in df.columns or "problem_id" not in df.columns or \
+       "dimension" not in df.columns:
+        print("  Skipping wes_surf: columns missing.")
+        return
+     
+    # Compute WES
+    plot_df = df.copy()
+    plot_df["WES"] = 1 / (1 + plot_df["perf"] * plot_df["wall_time"] / plot_df["total_evaluations"])
+     
+    # Extract rule and mode from experiment labels
+    plot_df["rule"] = plot_df["experiment"].apply(lambda x: _extract_rule_mode(x)[0])
+    plot_df["mode"] = plot_df["experiment"].apply(lambda x: _extract_rule_mode(x)[1])
+     
+    # Drop rows where parsing failed
+    valid_df = plot_df[(plot_df["rule"].notna()) & (plot_df["mode"].notna())]
+    if valid_df.empty:
+        print("  Skipping wes_surf: could not parse experiment labels.")
+        return
+     
+    # Get unique rules and modes
+    rules = sorted(valid_df["rule"].unique())
+    modes = sorted(valid_df["mode"].unique())
+      
+    # Use existing label dictionaries
+    rule_labels = _RULE_LABELS_LATEX
+    mode_labels = _MODE_LABELS
+      
+    # Create facet grid: rows=modes, cols=rules
+    n_modes = len(modes)
+    n_rules = len(rules)
+    fig_w = max(DOUBLE_COL_WIDTH, n_rules * 2.5)
+    fig_h = n_modes * 2.2 + 0.8
+     
+    fig, axes = plt.subplots(n_modes, n_rules, figsize=(fig_w, fig_h))
+     
+    # Ensure axes is 2D
+    if n_modes == 1:
+        axes = axes.reshape(1, -1)
+    if n_rules == 1:
+        axes = axes.reshape(-1, 1)
+     
+    # Shared min/max for colourbar
+    all_wes_values = []
+     
+    # First pass: collect all WES values for normalization
+    for mode in modes:
+        for rule in rules:
+            cell_data = valid_df[(valid_df["mode"] == mode) & (valid_df["rule"] == rule)]
+            if not cell_data.empty:
+                all_wes_values.extend(cell_data["WES"].values)
+     
+    if all_wes_values:
+        vmin, vmax = np.nanmin(all_wes_values), np.nanmax(all_wes_values)
+    else:
+        vmin, vmax = 0, 1
+     
+    # Second pass: plot each cell
+    for i, mode in enumerate(modes):
+        for j, rule in enumerate(rules):
+            ax = axes[i, j]
+             
+            cell_data = valid_df[(valid_df["mode"] == mode) & (valid_df["rule"] == rule)]
+             
+            if cell_data.empty:
+                ax.text(0.5, 0.5, "No data", ha="center", va="center",
+                       transform=ax.transAxes, fontsize=9, color="gray")
+                ensure_box_spines(ax)
+                continue
+             
+            # Pivot: dimension × function_id → median WES
+            pivot = cell_data.pivot_table(
+                index="problem_id", columns="dimension",
+                values="WES", aggfunc="median"
+            )
+             
+            # Sort by problem_id
+            pivot = pivot.sort_index()
+             
+            # Plot heatmap
+            im = ax.imshow(
+                pivot.values, aspect="auto", cmap="RdYlGn",
+                vmin=vmin, vmax=vmax, interpolation="nearest",
+                origin="lower",
+            )
+             
+            # Set ticks
+            ax.set_xticks(range(len(pivot.columns)))
+            ax.set_xticklabels(pivot.columns, fontsize=7)
+            ax.set_yticks(range(0, len(pivot.index), max(1, len(pivot.index)//5)))
+            ax.set_yticklabels(pivot.index[::max(1, len(pivot.index)//5)], fontsize=7)
+             
+            # Labels
+            if j == 0:
+                ax.set_ylabel(mode_labels[mode], fontsize=8)
+            else:
+                ax.set_ylabel("")
+             
+            if i == 0:
+                ax.set_title(rule_labels[rule], fontsize=8)
+             
+            if i == n_modes - 1:
+                ax.set_xlabel(r"Dimension, $D$", fontsize=7)
+            else:
+                ax.set_xlabel("")
+             
+            ensure_box_spines(ax)
+     
+    # Add shared y-label on the left
+    fig.text(0.01, 0.5, "Function ID", va="center", rotation="vertical",
+             fontsize=8)
+      
+    # Add shared colorbar
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    cbar = fig.colorbar(im, cax=cbar_ax)
+    cbar.set_label("Median WES", fontsize=7)
+      
+    plt.tight_layout(rect=[0.03, 0.05, 0.91, 0.98])
+    save_fig(fig, output_dir, "comparison_wes_surf")
+     
+    # Print WES statistics table in LaTeX format
+    print("\n" + "="*100)
+    print("WES STATISTICS TABLE")
+    print("="*100)
+     
+    # Prepare data for LaTeX table
+    dims = sorted(valid_df["dimension"].unique())
+    stats_list = ["median", "mean", "std", "IQR"]
+     
+    # Create multi-level index
+    rows = []
+    for dim in dims:
+        for stat in stats_list:
+            rows.append((dim, stat))
+     
+    # Create columns with (rule, mode) pairs
+    cols = []
+    for rule in sorted(rules):
+        for mode in sorted(modes):
+            cols.append((rule, mode))
+     
+    # Build table data
+    table_data = []
+    for dim, stat in rows:
+        row_data = []
+        dim_data = valid_df[valid_df["dimension"] == dim]
+         
+        for rule in sorted(rules):
+            for mode in sorted(modes):
+                cell_data = dim_data[(dim_data["rule"] == rule) & (dim_data["mode"] == mode)]
+                 
+                if cell_data.empty:
+                    row_data.append(np.nan)
+                else:
+                    wes_vals = cell_data["WES"].values
+                    if stat == "median":
+                        val = np.median(wes_vals)
+                    elif stat == "mean":
+                        val = np.mean(wes_vals)
+                    elif stat == "std":
+                        val = np.std(wes_vals)
+                    elif stat == "IQR":
+                        val = np.percentile(wes_vals, 75) - np.percentile(wes_vals, 25)
+                    row_data.append(val)
+         
+        table_data.append(row_data)
+     
+    # Create DataFrame with multi-index
+    df_table = pd.DataFrame(
+        table_data,
+        index=pd.MultiIndex.from_tuples(rows, names=["Dimension", "Statistic"]),
+        columns=pd.MultiIndex.from_tuples(cols, names=["Rule", "Mode"])
+    )
+     
+    # Convert to LaTeX table with proper formatting
+    latex_str = df_table.to_latex(
+        float_format=lambda x: f"{x:.4f}" if not np.isnan(x) else "—",
+        escape=True,
+        multirow=True,
+    )
+     
+    # Print to console and save to file
+    print(latex_str)
+     
+    # Save table to file
+    table_path = output_dir / "comparison_wes_surf_table.tex"
+    with open(table_path, "w") as f:
+        f.write(latex_str)
+    print(f"\n  Table saved to: {table_path}")
+    print("="*100 + "\n")
+
+
+
 def plot_perf_vs_time_per_eval(df: pd.DataFrame, output_dir: Path):
     """
     Faceted scatter plot with KDE contours: rows=experiments, columns=dimensions.
@@ -1856,6 +2196,9 @@ def main():
 
     plot_performance_by_dimension(df, output_dir)
     plot_performance_by_category(df, output_dir)
+    plot_wes_by_dimension(df, output_dir)
+    plot_wes_by_category(df, output_dir)
+    plot_wes_surf(df, output_dir)
     plot_dimension_scaling(df, output_dir)
     plot_performance_heatmap(df, output_dir)
     plot_summary_heatmap(df, output_dir)
